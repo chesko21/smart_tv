@@ -16,7 +16,7 @@ export interface Channel {
 
 const M3U_URL = "https://pastebin.com/raw/JyCSD9r1"; 
 const CACHE_KEY = "m3u_channels_cache"; 
-const CACHE_EXPIRATION = 60 * 60 * 1000; // 1 Jam
+const CACHE_EXPIRATION = 60 * 60 * 1000; 
 
 const useM3uParse = () => {
   const [channels, setChannels] = useState<Channel[]>([]);
@@ -30,12 +30,11 @@ const useM3uParse = () => {
         setLoading(true);
         setError(null);
 
-        // 🔥 Cek Cache di AsyncStorage
         const cachedData = await AsyncStorage.getItem(CACHE_KEY);
         if (cachedData) {
           const { channels: cachedChannels, timestamp } = JSON.parse(cachedData);
 
-          // Jika cache masih valid (tidak lebih dari 1 jam), gunakan cache
+         
           if (Date.now() - timestamp < CACHE_EXPIRATION) {
             console.log("⚡ Menggunakan cache untuk mempercepat render...");
             setChannels(cachedChannels);
@@ -44,8 +43,6 @@ const useM3uParse = () => {
             return;
           }
         }
-
-        // Jika tidak ada cache atau cache sudah kadaluarsa, lakukan fetch ulang
         console.log("📡 Fetching M3U data from:", M3U_URL);
         const response = await axios.get(M3U_URL);
         const data = response.data;
@@ -110,7 +107,6 @@ const useM3uParse = () => {
 
         const uniqueGroups = [...new Set(parsedChannels.map((ch) => ch.group))];
 
-        // 🔥 Simpan hasil ke Cache AsyncStorage
         await AsyncStorage.setItem(CACHE_KEY, JSON.stringify({ channels: parsedChannels, timestamp: Date.now() }));
 
         setChannels(parsedChannels);
