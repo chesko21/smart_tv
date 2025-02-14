@@ -1,17 +1,34 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
+    "target": "es2016",
+    "lib": ["es6", "dom"],
+    "allowJs": true,
+    "jsx": "react-native",
+    "moduleResolution": "node",
     "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
     "paths": {
       "@/*": [
         "./*"
       ]
     }
   },
+  "exclude": ["node_modules", "babel.config.js", "metro.config.js"],
+  
   "include": [
     "**/*.ts",
     "**/*.tsx",
-    ".expo/types/**/*.ts",
-    "expo-env.d.ts"
+    "**/*.js",
+    "app/**/*.tsx",
+    "types.d.ts",
+    "global.d.ts",
+    "expo-env.d.ts",         
+    ".expo/types/**/*.ts"
   ]
+
+
 }

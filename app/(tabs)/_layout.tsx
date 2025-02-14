@@ -1,45 +1,58 @@
-import { Tabs } from 'expo-router';
-import React from 'react';
-import { Platform } from 'react-native';
+import { Tabs } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import Colors from "../../constants/Colors";
 
-import { HapticTab } from '@/components/HapticTab';
-import { IconSymbol } from '@/components/ui/IconSymbol';
-import TabBarBackground from '@/components/ui/TabBarBackground';
-import { Colors } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/useColorScheme';
-
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
-  return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        headerShown: false,
-        tabBarButton: HapticTab,
-        tabBarBackground: TabBarBackground,
-        tabBarStyle: Platform.select({
-          ios: {
-            // Use a transparent background on iOS to show the blur effect
-            position: 'absolute',
-          },
-          default: {},
-        }),
-      }}>
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="explore"
-        options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
-        }}
-      />
-    </Tabs>
-  );
+export default function TabsLayout() {
+    return (
+        <Tabs
+            screenOptions={{
+                headerShown: false,
+                tabBarActiveTintColor: Colors.primary,
+                tabBarInactiveTintColor: "#888",
+                tabBarStyle: {
+                    backgroundColor: Colors.background,
+                    borderTopWidth: 1,
+                    borderTopColor: "#bbb",
+                    height: 50,
+                    paddingBottom: 5,
+                },
+            }}
+        >
+            <Tabs.Screen
+                name="index"
+                options={{
+                    title: "Home",
+                    tabBarIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />,
+                }}
+            />
+            <Tabs.Screen
+                name="Vod"
+                options={{
+                    title: "VOD",
+                    tabBarIcon: ({ color, size }) => <Ionicons name="videocam" size={size} color={color} />,
+                }}
+            />
+            <Tabs.Screen
+                name="LiveTv"
+                options={{
+                    title: "Live TV",
+                    tabBarIcon: ({ color, size }) => <Ionicons name="tv" size={size} color={color} />,
+                }}
+            />
+            <Tabs.Screen
+                name="PlayerScreen"
+                options={{
+                    title: "Vidio",
+                    tabBarIcon: ({ color, size }) => <Ionicons name="laptop" size={size} color={color} />,
+                }}
+            />
+            <Tabs.Screen
+                name="Profile"
+                options={{
+                    title: "Profile",
+                    tabBarIcon: ({ color, size }) => <Ionicons name="person" size={size} color={color} />,
+                }}
+            />
+        </Tabs>
+    );
 }
