@@ -1,7 +1,7 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { 
   View, Text, FlatList, Image, TouchableOpacity, 
-  StyleSheet, ActivityIndicator, Dimensions
+  StyleSheet, ActivityIndicator, Dimensions, Animated, RefreshControl
 } from "react-native";
 import { useRouter } from "expo-router";
 import Colors from "../../constants/Colors";
@@ -13,11 +13,10 @@ const { width } = Dimensions.get("window");
 const Vod = () => {
   const router = useRouter();
   const { channels, loading } = useM3uParse();
-  const [vodData, setVodData] = useState<any[]>([]);
-  const [slideshowData, setSlideshowData] = useState<any[]>([]);
-  const [errorLogos, setErrorLogos] = useState<{ [key: string]: boolean }>({});
+  const [refreshing, setRefreshing] = useState(false);
   const flatListRef = useRef<FlatList>(null);
-  let currentIndex = 0;
+  const scrollX = useRef(new Animated.Value(0)).current;
+  const currentIndexRef = useRef(0);
 
   const groupKeywords = [
     "movies", "series", "national movies", "general movies",
@@ -25,35 +24,73 @@ const Vod = () => {
     "spanish movies", "korean series", "portuguese series",
   ];
 
-  useEffect(() => {
-    if (channels) {
-      const filteredVOD = channels.filter((channel) =>
-        groupKeywords.some((keyword) =>
-          (channel.group || "").toLowerCase().includes(keyword)
-        )
-      );
+  // Gunakan useMemo agar filtering hanya terjadi saat channels berubah
+  const vodData = useMemo(() => 
+    channels.filter((channel) =>
+      groupKeywords.some((keyword) =>
+        (channel.group || "").toLowerCase().includes(keyword)
+      )
+    ), 
+    [channels]
+  );
 
-      setVodData(filteredVOD);
+  const slideshowData = useMemo(() => 
+    [...vodData].sort(() => 0.5 - Math.random()).slice(0, 5), 
+    [vodData]
+  );
 
-      const shuffled = [...filteredVOD].sort(() => 0.5 - Math.random()).slice(0, 5);
-      setSlideshowData(shuffled);
-    }
-  }, [channels]);
-
+  // Auto-scroll slideshow
   useEffect(() => {
     const interval = setInterval(() => {
-      if (slideshowData.length > 0) {
-        currentIndex = (currentIndex + 1) % slideshowData.length;
-        flatListRef.current?.scrollToIndex({ index: currentIndex, animated: true });
-      }
-    }, 10000); 
+      currentIndexRef.current = (currentIndexRef.current + 1) % slideshowData.length;
+      Animated.timing(scrollX, {
+        toValue: currentIndexRef.current * width,
+        duration: 500,
+        useNativeDriver: false,
+      }).start();
+      flatListRef.current?.scrollToOffset({ offset: scrollX._value, animated: true });
+    }, 10000);
 
     return () => clearInterval(interval);
   }, [slideshowData]);
 
-  const handleImageError = (url: string) => {
-    setErrorLogos((prev) => ({ ...prev, [url]: true }));
+  // Fungsi refresh
+  const onRefresh = () => {
+    setRefreshing(true);
+    setTimeout(() => setRefreshing(false), 2000);
   };
+
+  // Menghindari re-render berlebihan dengan useCallback
+  const renderVodItem = useCallback(({ item }) => (
+    <TouchableOpacity
+      style={styles.card}
+      onPress={() => router.push({ pathname: "/PlayerScreen", params: { url: item.url } })}
+    >
+      <Image 
+        source={{ uri: item.logo }}
+        defaultSource={tvBanner} 
+        style={styles.cardImage} 
+      />
+      <Text style={styles.cardText}>{truncateName(item.name, 15)}</Text>
+    </TouchableOpacity>
+  ), []);
+
+  const renderSlideItem = useCallback(({ item }) => (
+    <TouchableOpacity 
+      style={styles.slideItem} 
+      onPress={() => router.push({ pathname: "/PlayerScreen", params: { url: item.url } })}
+    >
+      <Image 
+        source={{ uri: item.logo }}
+        defaultSource={tvBanner} 
+        style={styles.slideImage}
+      />
+      <Text style={styles.slideText}>{truncateName(item.name, 20)}</Text>
+    </TouchableOpacity>
+  ), []);
+
+  const truncateName = (name: string, limit: number) => 
+    name.length > limit ? name.slice(0, limit) + "..." : name;
 
   if (loading) {
     return (
@@ -64,11 +101,9 @@ const Vod = () => {
     );
   }
 
-  const truncateName = (name: string) => name.length > 15 ? name.slice(0, 15) + "..." : name;
-
   return (
     <View style={{ flex: 1, backgroundColor: Colors.background }}>
-      <Text style={{ color: "#fff", fontSize: 22, fontWeight: "bold", marginBottom: 10 , marginTop: 30, padding: 5 }}>🎥 Video On Demand</Text>
+      <Text style={styles.title}>🎥 Video On Demand</Text>
       
       {/* 🎥 Slideshow */}
       <View style={styles.carouselContainer}>
@@ -79,19 +114,7 @@ const Vod = () => {
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
-          renderItem={({ item }) => (
-            <TouchableOpacity 
-              style={styles.slideItem} 
-              onPress={() => router.push({ pathname: "/PlayerScreen", params: { url: item.url } })}
-            >
-              <Image 
-                source={errorLogos[item.url] ? tvBanner : { uri: item.logo }}
-                style={styles.slideImage}
-                onError={() => handleImageError(item.url)}
-              />
-              <Text style={styles.slideText}>{truncateName(item.name)}</Text>
-            </TouchableOpacity>
-          )}
+          renderItem={renderSlideItem}
         />
       </View>
 
@@ -102,19 +125,8 @@ const Vod = () => {
         numColumns={3} 
         columnWrapperStyle={{ justifyContent: "space-between" }}
         contentContainerStyle={{ padding: 10 }}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.card}
-            onPress={() => router.push({ pathname: "/PlayerScreen", params: { url: item.url } })}
-          >
-            <Image 
-              source={errorLogos[item.url] ? tvBanner : { uri: item.logo }} 
-              style={styles.cardImage} 
-              onError={() => handleImageError(item.url)}
-            />
-            <Text style={styles.cardText}>{truncateName(item.name)}</Text>
-          </TouchableOpacity>
-        )}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        renderItem={renderVodItem}
       />
     </View>
   );
@@ -158,6 +170,16 @@ const styles = StyleSheet.create({
   },
   cardText: {
     marginTop: 5, color: "#fff", fontSize: 12, fontWeight: "bold", textAlign: "center",
+  },
+
+  title: {
+    color: "#fff",
+    fontSize: 22,
+    fontWeight: "bold",
+    marginBottom: 10,
+    marginTop: 30,
+    padding: 5,
+    textAlign: "center",
   },
 });
 

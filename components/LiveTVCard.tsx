@@ -1,7 +1,6 @@
 import React from "react";
 import { View, Text, Image, TouchableOpacity, StyleSheet } from "react-native";
 
-
 const defaultLogo = require("../assets/images/tv_banner.png");
 
 export interface ChannelProps {
@@ -29,6 +28,7 @@ const LiveTVCard: React.FC<ChannelProps> = ({ channel, onPress }) => {
       <View style={styles.imageContainer}>
         <Image
           source={channel.logo ? { uri: channel.logo } : defaultLogo}
+          defaultSource={defaultLogo} 
           style={styles.image}
           resizeMode="cover"
         />
@@ -53,7 +53,6 @@ const styles = StyleSheet.create({
     borderColor: "#edec25",
     alignSelf: "flex-start", 
   },
-
   imageContainer: {
     width: "80%", 
     aspectRatio: 1,
@@ -65,13 +64,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#edec25",
   },
-
   image: {
     width: "100%",
     height: "100%",
     resizeMode: "cover",
   },
-
   text: {
     fontSize: 12,
     fontWeight: "700",

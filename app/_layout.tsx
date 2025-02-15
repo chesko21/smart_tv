@@ -1,10 +1,11 @@
-import { Stack } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, Platform, SafeAreaView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as NavigationBar from "expo-navigation-bar";
 import NetInfo from "@react-native-community/netinfo";
+import * as ScreenOrientation from 'expo-screen-orientation';
 
 export default function Layout() {
     const [isOnline, setIsOnline] = useState(true);
@@ -17,13 +18,14 @@ export default function Layout() {
                 setShowBackOnline(true);
                 setTimeout(() => setShowBackOnline(false), 3000);
             }
-            setIsOnline(state.isInternetReachable ?? true);
+            setIsOnline(state.isInternetReachable ?? state.isConnected ?? true);
         });
 
         return () => unsubscribe();
     }, [isOnline]);
 
     useEffect(() => {
+        // Hide the navigation bar for fullscreen on Android
         if (Platform.OS === "android") {
             const hideNavigationBar = async () => {
                 await NavigationBar.setVisibilityAsync("hidden");
@@ -32,15 +34,14 @@ export default function Layout() {
 
             hideNavigationBar();
 
-            const interval = setInterval(() => {
-                hideNavigationBar();
-            }, 3000);
-
             return () => {
-                clearInterval(interval);
                 NavigationBar.setVisibilityAsync("visible");
             };
         }
+
+        // Lock orientation to landscape or portrait (optional)
+        ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+
     }, []);
 
     return (
@@ -66,7 +67,7 @@ export default function Layout() {
                 {/* Navigasi Stack */}
                 <Stack>
                     <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                    <Stack.Screen name="schedule" options={{ headerShown: true, title: "Jadwal TV" }} />
+                   
                 </Stack>
             </SafeAreaView>
         </>

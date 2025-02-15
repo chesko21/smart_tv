@@ -1,7 +1,13 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
-  View, Text, ScrollView, Image, TouchableOpacity,
-  FlatList, ActivityIndicator, Animated, Dimensions
+  View,
+  Text,
+  ScrollView,
+  Image,
+  TouchableOpacity,
+  FlatList,
+  Animated,
+  Dimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
 import Colors from "../../constants/Colors";
@@ -17,64 +23,136 @@ const getRandomChannels = (channels: any, num = 10) => {
 
 export default function Home() {
   const router = useRouter();
-  const { channels, loading, error } = useM3uParse();
-  const [radioData, setRadioData] = useState<any[]>([]);
-  const [slideshowData, setSlideshowData] = useState<any[]>([]);
-  const [errorLogos, setErrorLogos] = useState<{ [key: string]: boolean }>({});
-  const flatListRef = useRef<FlatList>(null);
-  const currentIndexRef = useRef(0);
+  const { channels, loading } = useM3uParse();
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorImages, setErrorImages] = useState<{ [key: string]: boolean }>({});
 
-  const radioKeywords = ["radio", "radio indonesia", "pinoy radio", "malay radio", "rri radio"];
-  const sportsKeywords = ["sport", "sports", "olahraga"];
+  // Skeleton animation setup
+  const shimmerAnim = useRef(new Animated.Value(0)).current;
+  const fadeInAnim = useRef(new Animated.Value(0)).current;
+
+  // Slideshow data and radio data
+  const [slideshowData, setSlideshowData] = useState<any[]>([]);
+  const [radioData, setRadioData] = useState<any[]>([]);
 
   useEffect(() => {
-    if (channels.length > 0) {
-      const filteredSports = channels.filter((channel) =>
-        sportsKeywords.some((keyword) => channel.group?.toLowerCase().includes(keyword))
-      );
-      setSlideshowData(getRandomChannels(filteredSports, 5));
+    setTimeout(() => setIsLoading(false), 5000);
+  }, []);
 
-      const filteredRadio = channels.filter((channel) =>
-        radioKeywords.some((keyword) => channel.group?.toLowerCase().includes(keyword))
-      );
-      setRadioData(filteredRadio);
-    }
+  // Set up shimmer animation
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([ 
+        Animated.timing(shimmerAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shimmerAnim, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, []);
+
+  // Filter channels for sports and radio
+  const filteredSports = useMemo(() => {
+    const sportsKeywords = ["sport", "sports", "olahraga", "bola"];
+    return channels.filter((channel) =>
+      sportsKeywords.some((keyword) => channel.group?.toLowerCase()?.includes(keyword))
+    );
+  }, [channels]);
+
+  const filteredRadio = useMemo(() => {
+    const radioKeywords = ["radio", "radio indonesia", "pinoy radio", "malay radio", "rri radio"];
+    return channels.filter((channel) =>
+      radioKeywords.some((keyword) => channel.group?.toLowerCase()?.includes(keyword))
+    );
   }, [channels]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (slideshowData.length > 0) {
-        currentIndexRef.current = (currentIndexRef.current + 1) % slideshowData.length;
-        flatListRef.current?.scrollToIndex({ index: currentIndexRef.current, animated: true });
-      }
-    }, 10000);
+    if (filteredSports.length > 0) {
+      setSlideshowData(filteredSports);
+    }
+    if (filteredRadio.length > 0) {
+      setRadioData(filteredRadio);
+    }
+  }, [filteredSports, filteredRadio]);
 
-    return () => clearInterval(interval);
-  }, [slideshowData]);
+  // Fade-in animation after loading
+  useEffect(() => {
+    if (!isLoading) {
+      Animated.timing(fadeInAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [isLoading]);
 
   const handleImageError = (url: string) => {
-    setErrorLogos((prev) => ({ ...prev, [url]: true }));
+    setErrorImages((prev) => ({ ...prev, [url]: true }));
   };
 
-  if (loading) {
+  if (loading || isLoading) {
+    // Return skeleton loading view
     return (
-      <View style={styles.centeredContainer}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-        <Text>Loading...</Text>
-      </View>
-    );
-  }
+      <ScrollView contentContainerStyle={styles.container}>
+        <Text style={styles.header}>Smart TV Streaming</Text>
 
-  if (error) {
-    return (
-      <View style={styles.centeredContainer}>
-        <Text style={{ color: "#fff" }}>Error loading channels. Please try again later.</Text>
-      </View>
+        <Animated.View style={[styles.skeletonBanner, { opacity: shimmerAnim }]} />
+        
+        {/* Navigation Buttons Skeleton */}
+        <View style={styles.navContainer}>
+          <Animated.View style={[styles.skeletonNavButton, { opacity: shimmerAnim }]} />
+          <Animated.View style={[styles.skeletonNavButton, { opacity: shimmerAnim }]} />
+        </View>
+
+        {/* Slideshow Skeleton */}
+        <FlatList
+          data={Array(5).fill(null)}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={(_, index) => `skeleton-slide-${index}`}
+          renderItem={() => <Animated.View style={[styles.skeletonSlide, { opacity: shimmerAnim }]} />}
+        />
+
+        {/* Recommended Channels Skeleton */}
+        <FlatList
+          data={Array(10).fill(null)}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={(_, index) => `skeleton-card-${index}`}
+          renderItem={() => (
+            <View style={styles.skeletonCardContainer}>
+              <Animated.View style={[styles.skeletonCard, { opacity: shimmerAnim }]} />
+              <Animated.View style={[styles.skeletonText, { opacity: shimmerAnim }]} />
+            </View>
+          )}
+        />
+
+        {/* Radio Channels Skeleton */}
+        <FlatList
+          data={Array(5).fill(null)}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={(_, index) => `skeleton-radio-${index}`}
+          renderItem={() => (
+            <View style={styles.skeletonCardContainer}>
+              <Animated.View style={[styles.skeletonCard, { opacity: shimmerAnim }]} />
+              <Animated.View style={[styles.skeletonText, { opacity: shimmerAnim }]} />
+            </View>
+          )}
+        />
+      </ScrollView>
     );
   }
 
   return (
-    <ScrollView contentContainerStyle={{ padding: 16, backgroundColor: Colors.background }}>
+    <Animated.ScrollView contentContainerStyle={styles.container} style={{ opacity: fadeInAnim }}>
       <Text style={styles.header}>Smart TV Streaming</Text>
       <Image source={tvBanner} style={styles.banner} resizeMode="cover" />
 
@@ -87,38 +165,43 @@ export default function Home() {
         </TouchableOpacity>
       </View>
 
+      {/* Slideshow Sports Channels */}
+      <Text style={styles.sectionTitle}>⚽ SPORT</Text>
+
       <FlatList
-        ref={flatListRef}
         data={slideshowData}
         horizontal
-        pagingEnabled
         showsHorizontalScrollIndicator={false}
-        keyExtractor={(item) => item.tvgId || item.name}
+        keyExtractor={(item, index) => `${item.tvgId || item.name}-${index}`}
         renderItem={({ item }) => (
           <TouchableOpacity
-            style={styles.slideItem}
+            style={styles.card}
             onPress={() => router.push({ pathname: "/PlayerScreen", params: { url: item.url } })}
           >
             <Image
-              source={errorLogos[item.url] ? tvBanner : { uri: item.logo }}
-              style={styles.slideImage}
+              source={errorImages[item.url] ? tvBanner : { uri: item.logo }}
+              style={styles.cardImage}
               onError={() => handleImageError(item.url)}
             />
-            <Text style={styles.slideText}>{item.name}</Text>
+            <Text style={styles.cardText}>{item.name}</Text>
           </TouchableOpacity>
         )}
       />
 
+      {/* Recommended Channel */}
       <Text style={styles.sectionTitle}>🔥 REKOMENDASI UNTUK ANDA</Text>
       <FlatList
         data={getRandomChannels(channels)}
         horizontal
         showsHorizontalScrollIndicator={false}
-        keyExtractor={(item) => item.url}
+        keyExtractor={(item, index) => `${item.url || item.tvgId || item.name}-${index}`}
         renderItem={({ item }) => (
-          <TouchableOpacity style={styles.card} onPress={() => router.push({ pathname: "/PlayerScreen", params: { url: item.url } })}>
+          <TouchableOpacity
+            style={styles.card}
+            onPress={() => router.push({ pathname: "/PlayerScreen", params: { url: item.url } })}
+          >
             <Image
-              source={errorLogos[item.url] ? tvBanner : { uri: item.logo }}
+              source={errorImages[item.url] ? tvBanner : { uri: item.logo }}
               style={styles.cardImage}
               resizeMode="cover"
               onError={() => handleImageError(item.url)}
@@ -128,6 +211,7 @@ export default function Home() {
         )}
       />
 
+      {/* Radio Channels */}
       <Text style={styles.sectionTitle}>🎶 RADIO PLAYER</Text>
       <FlatList
         data={radioData}
@@ -137,7 +221,7 @@ export default function Home() {
         renderItem={({ item }) => (
           <TouchableOpacity style={styles.card} onPress={() => router.push({ pathname: "/PlayerScreen", params: { url: item.url } })}>
             <Image
-              source={errorLogos[item.url] ? tvBanner : { uri: item.logo }}
+              source={errorImages[item.url] ? tvBanner : { uri: item.logo }}
               style={styles.cardImage}
               resizeMode="cover"
               onError={() => handleImageError(item.url)}
@@ -146,15 +230,14 @@ export default function Home() {
           </TouchableOpacity>
         )}
       />
-    </ScrollView>
+    </Animated.ScrollView>
   );
 }
 
+
 const styles = {
-  centeredContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+  container: {
+    padding: 16,
     backgroundColor: Colors.background,
   },
   header: {
@@ -168,8 +251,21 @@ const styles = {
     width: "100%",
     height: 160,
     borderRadius: 10,
+    marginBottom: 20, 
+  },
+  skeletonBanner: {
+    width: "100%",
+    height: 160,
+    borderRadius: 10,
+    backgroundColor: "#555", 
+    marginBottom: 20, 
   },
   navContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginVertical: 20,
+  },
+  skeletonNavContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginVertical: 20,
@@ -182,9 +278,14 @@ const styles = {
     marginHorizontal: 5,
     alignItems: "center",
   },
-  navText: {
-    color: "#fff",
-    fontWeight: "700",
+  skeletonNavButton: {
+    backgroundColor: "#555",
+    padding: 15,
+    borderRadius: 10,
+    flex: 1,
+    marginHorizontal: 5,
+    height: 50,
+    opacity: 0.7, 
   },
   sectionTitle: {
     color: "#fff",
@@ -192,52 +293,52 @@ const styles = {
     fontWeight: "700",
     marginBottom: 20,
   },
-  card: {
-    marginRight: 10,
-    width: 150,
-    marginBottom: 20,
+  skeletonSlide: {
+    width: width - 40,
+    height: 150,
     borderRadius: 10,
-    overflow: "hidden",
-    backgroundColor: "#333",
+    backgroundColor: "#555",
+    marginRight: 15,
+    marginBottom: 20,
+  },
+  skeletonCardContainer: {
     alignItems: "center",
+    marginRight: 15,
+    marginBottom: 15,
+  },
+  skeletonText: {
+    width: 80,  
+    height: 12,
+    backgroundColor: "#555",
+    borderRadius: 5,
+    marginTop: 8, 
+  },
+  card: {
+    backgroundColor: "#222",
+    padding: 10,
+    borderRadius: 10,
+    marginRight: 15,
+    width: 120,
+    alignItems: "center",
+    marginBottom: 20, 
+  },
+  skeletonCard: {
+    backgroundColor: "#555",
+    width: 120,
+    height: 100,
+    borderRadius: 10,
+    marginRight: 15,
+    marginBottom: 15, 
   },
   cardImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 20,
-    margin: 5,
-    borderWidth: 2,
-    borderColor: "#000",
+    width: 110,
+    height: 90,
+    borderRadius: 10,
+    marginBottom: 5,
   },
   cardText: {
-    padding: 5,
+    color: "#fff",
+    fontSize: 13,
     textAlign: "center",
-    fontWeight: "700",
-    color: "#fff",
-  },
-  slideItem: {
-    width,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 5,
-    margin: 5,
-  },
-  slideImage: {
-    width: width * 0.9,
-    height: 130,
-    borderRadius: 15,
-    borderWidth: 2,
-    borderColor: "rgba(79, 12, 235, 0.6)",
-  },
-  slideText: {
-    position: "absolute",
-    bottom: 10,
-    left: 10,
-    color: "#fff",
-    fontWeight: "700",
-    fontSize: 16,
-    backgroundColor: "rgba(79, 12, 235, 0.6)",
-    padding: 5,
-    borderRadius: 5,
   },
 };

@@ -14,9 +14,9 @@ export interface Channel {
   referrer: string | null;
 }
 
-const M3U_URL = "https://pastebin.com/raw/JyCSD9r1"; 
-const CACHE_KEY = "m3u_channels_cache"; 
-const CACHE_EXPIRATION = 60 * 60 * 1000; 
+const M3U_URL = "https://pastebin.com/raw/JyCSD9r1";
+const CACHE_KEY = "m3u_channels_cache";
+const CACHE_EXPIRATION = 60 * 60 * 1000;
 
 const useM3uParse = () => {
   const [channels, setChannels] = useState<Channel[]>([]);
@@ -34,7 +34,6 @@ const useM3uParse = () => {
         if (cachedData) {
           const { channels: cachedChannels, timestamp } = JSON.parse(cachedData);
 
-         
           if (Date.now() - timestamp < CACHE_EXPIRATION) {
             console.log("⚡ Menggunakan cache untuk mempercepat render...");
             setChannels(cachedChannels);
@@ -88,6 +87,7 @@ const useM3uParse = () => {
             }
           }
 
+          // Menangani license_key dan license_type dengan lebih baik
           if (licenseKey && (licenseKey.includes(":") || licenseKey.startsWith("http"))) {
             currentChannel.license_key = licenseKey;
           }
@@ -113,7 +113,7 @@ const useM3uParse = () => {
         setGroups(uniqueGroups);
       } catch (err: any) {
         console.error("❌ Error fetching M3U:", err);
-        setError(`Failed to load channels: ${err.message}`);
+        setError(`Failed to load channels: ${err.message}.  Please check M3U URL: ${M3U_URL}`); // Pesan error yang lebih informatif
       } finally {
         setLoading(false);
       }

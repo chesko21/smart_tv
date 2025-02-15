@@ -1,21 +1,19 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
     View, ActivityIndicator, Text,
     StyleSheet, BackHandler,
-    FlatList, TouchableOpacity, Image, NativeModules
+    FlatList, TouchableOpacity, Image
 } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import Video from "react-native-video";
+import { useLocalSearchParams, useRouter, useNavigation } from "expo-router"; // Import useNavigation
+import Video, { DRMType } from "react-native-video";
 import useM3uParse from "../../hooks/M3uParse";
 import { Buffer } from "buffer";
-import Colors from "@/constants/Colors";
-import * as ScreenOrientation from "expo-screen-orientation";
 import epgData from "../../hooks/processedEPG.json";
 import { DateTime } from "luxon";
 import { useFocusEffect } from "@react-navigation/native";
 import Toast from "react-native-toast-message";
-
-
+import { EventEmitter } from "expo-modules-core";
 
 type DRMType = 'widevine' | 'playready' | 'fairplay' | 'clearkey';
 
@@ -34,6 +32,7 @@ interface Program {
     stop: string;
     title: string;
 }
+export const watchHistoryEvent = new EventEmitter();
 
 const PlayerScreen = () => {
     const { url } = useLocalSearchParams();
@@ -41,16 +40,17 @@ const PlayerScreen = () => {
     const [loading, setLoading] = useState(true);
     const [buffering, setBuffering] = useState(false);
     const [error, setError] = useState(false);
-    const [drmConfig, setDrmConfig] = useState < DrmConfig > ({});
-    const videoRef = useRef < Video | null > (null);
+    const [drmConfig, setDrmConfig] = useState<DrmConfig>({});
+    const playerRef = useRef(null);
     const { channels } = useM3uParse();
-    const [isFullScreen, setIsFullScreen] = useState(false);
     const router = useRouter();
-    const [programmes, setProgrammes] = useState < (Program | undefined)[] > ([]);
-    const [recommendedChannels, setRecommendedChannels] = useState < typeof channels > ([]);
+    const navigation = useNavigation();
+    const [programmes, setProgrammes] = useState<(Program | undefined)[]>([]);
+    const [recommendedChannels, setRecommendedChannels] = useState<typeof channels>([]);
     const selectedChannel = channels.find(channel => channel.url === url);
     const channelName = selectedChannel?.name || "Unknown Channel";
-
+    const [hasSavedHistory, setHasSavedHistory] = useState(false);
+    const [isPlaying, setIsPlaying] = useState(false); 
     const normalizeTvgId = (id: string | null) => id?.trim() || '';
 
     const epgChannel = epgData.find(epg => normalizeTvgId(epg.tvgId) === normalizeTvgId(selectedChannel?.tvgId)) || null;
@@ -60,17 +60,57 @@ const PlayerScreen = () => {
         ?.slice(0, 5)
         : [];
 
-
     useFocusEffect(
         useCallback(() => {
-            setPaused(false);
-            return () => {
-                setPaused(true);
+            const pauseVideo = () => {
+                if (playerRef.current) {
+                    playerRef.current.pause();
+                    setIsPlaying(false);
+                }
             };
-        }, [])
+
+            const resumeVideo = () => {
+                if (playerRef.current && !paused) { 
+                    playerRef.current.resume();
+                    setIsPlaying(true);
+                }
+            };
+            const unsubscribeFocus = navigation.addListener('focus', resumeVideo);
+            const unsubscribeBlur = navigation.addListener('blur', pauseVideo);
+         return () => {
+                pauseVideo(); 
+                unsubscribeFocus();
+                unsubscribeBlur();
+            };
+        }, [navigation, paused]) 
     );
 
+    const saveToWatchHistory = async () => {
+        try {
+            if (!selectedChannel || hasSavedHistory) return;
 
+            const newEntry = {
+                name: channelName,
+                timestamp: new Date().toLocaleString(),
+            };
+
+            const storedHistory = await AsyncStorage.getItem("watchHistory");
+            let historyArray = storedHistory ? JSON.parse(storedHistory) : [];
+
+            const exists = historyArray.some((item) => item.name === newEntry.name);
+            if (!exists) {
+                historyArray.unshift(newEntry);
+                if (historyArray.length > 10) historyArray.pop();
+                await AsyncStorage.setItem("watchHistory", JSON.stringify(historyArray));
+
+                watchHistoryEvent.emit("historyUpdated");
+            }
+
+            setHasSavedHistory(true);
+        } catch (error) {
+            console.error("Gagal menyimpan riwayat tontonan:", error);
+        }
+    };
     useEffect(() => {
         if (!url || channels.length === 0) return;
 
@@ -91,7 +131,6 @@ const PlayerScreen = () => {
                 prog.start > nowString && (!currentProgram || prog.start > currentProgram.start)
             ) || { title: "Tidak ada informasi program", start: "", stop: "" };
 
-
             setProgrammes([currentProgram, nextProgram].filter(Boolean) as Program[]);
         } else {
             setProgrammes([
@@ -101,30 +140,20 @@ const PlayerScreen = () => {
         }
     }, [url, channels]);
 
-    const formatTime = (timeString: string) => {
+   const formatTime = (timeString: string) => {
         if (!timeString || timeString.length < 14) return "Invalid Time";
 
         const datePart = timeString.substring(0, 14);
         const offsetPart = timeString.substring(15);
-
-        const formattedOffset = offsetPart ? `${offsetPart.substring(0, 3)}:${offsetPart.substring(3)}` : "+00:00";
-
-        const dateTime = DateTime.fromFormat(datePart, "yyyyMMddHHmmss", { zone: `UTC${formattedOffset}` });
-        return dateTime.setZone(DateTime.local().zoneName).toFormat("HH:mm");
+   let dateTime;
+        if (offsetPart) {
+            const formattedOffset = `${offsetPart.substring(0, 3)}:${offsetPart.substring(3)}`;
+            dateTime = DateTime.fromFormat(datePart, "yyyyMMddHHmmss", { zone: `UTC${formattedOffset}` });
+        } else {
+            dateTime = DateTime.fromFormat(datePart, "yyyyMMddHHmmss", { zone: 'UTC' }); // Default to UTC if no offset
+        }
+     return dateTime.setZone(DateTime.local().zoneName).toFormat("HH:mm");
     };
-
-
-    useEffect(() => {
-        const backAction = () => {
-            router.back();
-            return true;
-        };
-
-        const backHandler = BackHandler.addEventListener("hardwareBackPress", backAction);
-        return () => backHandler.remove();
-    }, []);
-
-
 
     useEffect(() => {
         const configureDrm = async () => {
@@ -134,7 +163,7 @@ const PlayerScreen = () => {
             if (!selectedChannel) return;
 
             let newDrmConfig: DrmConfig = {
-                clearKeys: "clearkey"
+                type: "none", 
             };
 
             if (selectedChannel.license_type?.includes("clearkey") && selectedChannel.license_key) {
@@ -145,14 +174,10 @@ const PlayerScreen = () => {
                 if (kidBase64 && keyHex) {
                     newDrmConfig = {
                         type: "clearkey",
-                        licenseServer: "",
-                        headers: {},
                         clearKeys: JSON.stringify({ [kidBase64]: keyHex }),
                     };
-
                 } else {
                     console.error("Invalid ClearKey DRM keys");
-                    return;
                 }
             }
             else if (selectedChannel.license_type?.includes("widevine") && selectedChannel.license_key) {
@@ -162,7 +187,6 @@ const PlayerScreen = () => {
                 };
             }
 
-            //   console.log("DRM Config:", JSON.stringify(newDrmConfig, null, 2));
 
             setDrmConfig(newDrmConfig);
         };
@@ -170,72 +194,6 @@ const PlayerScreen = () => {
         configureDrm();
     }, [url, channels]);
 
-    useEffect(() => {
-        if (url) {
-            setPaused(false);
-        }
-    }, [url]);
-
-
-    const handleLoad = () => {
-        setTimeout(() => {
-            setLoading(false);
-        }, 500);
-    };
-
-    const handleError = (error: any) => {
-        setLoading(false);
-        setError(true);
-
-        console.error("Video Player Error:", error);
-        const errorMessage = error.errorString || "Terjadi kesalahan saat memutar video.";
-
-        Toast.show({
-            type: "error",
-            text1: "Gagal Memuat Video",
-            text2: errorMessage,
-            position: "top",
-            visibilityTime: 4000,
-            autoHide: true,
-        });
-    };
-
-    const handleBuffer = ({ isBuffering }: { isBuffering: boolean }) => {
-        setBuffering(isBuffering);
-        if (isBuffering) setLoading(true);
-    };
-
-
-    const handleChannelChange = useCallback((channelUrl: string) => {
-        setLoading(true);
-        setError(false);
-        setPaused(false);
-        router.push({ pathname: "/PlayerScreen", params: { url: channelUrl } });
-    }, []);
-
-
-    const handleFullScreen = async () => {
-        try {
-            if (isFullScreen) {
-                await ScreenOrientation.unlockAsync();
-            } else {
-                await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
-            }
-            setIsFullScreen(!isFullScreen);
-        } catch (e) {
-            console.error("Error handling fullscreen:", e);
-        }
-    };
-
-    const onFullscreenPlayerWillPresent = () => {
-        ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
-        setIsFullScreen(true);
-    };
-
-    const onFullscreenPlayerWillDismiss = () => {
-        ScreenOrientation.unlockAsync();
-        setIsFullScreen(false);
-    };
     useEffect(() => {
         if (channels.length === 0) return;
 
@@ -261,10 +219,81 @@ const PlayerScreen = () => {
         setRecommendedChannels(recommended);
     }, [channels, url]);
 
+
+    useEffect(() => {
+        if (url) {
+            setPaused(false);
+            setIsPlaying(true); 
+        }
+    }, [url]);
+
+    useEffect(() => {
+        const backAction = () => {
+            router.back();
+            return true;
+        };
+
+        const backHandler = BackHandler.addEventListener("hardwareBackPress", backAction);
+        return () => backHandler.remove();
+    }, [router]);
+
+    const handleError = (error: any) => {
+        setLoading(false);
+        setError(true);
+        setIsPlaying(false); 
+
+        console.error("Video Player Error:", error);
+        const errorMessage = error.errorString || "Terjadi kesalahan saat memutar video.";
+
+        Toast.show({
+            type: "error",
+            text1: "Gagal Memuat Video",
+            text2: errorMessage,
+            position: "top",
+            visibilityTime: 4000,
+            autoHide: true,
+        });
+    };
+
+    const handleLoadStart = () => {
+        // console.log("Memulai loading video...");
+        setLoading(true);
+        setBuffering(true);
+    };
+
+    useEffect(() => {
+        if (!hasSavedHistory) {
+            saveToWatchHistory();
+        }
+    }, [hasSavedHistory]);
+
+    const handleLoad = () => {
+        setLoading(false);
+        setBuffering(false);
+        setHasSavedHistory(true);
+    };
+
+
+    const handleBuffer = ({ isBuffering }: { isBuffering: boolean }) => {
+        // console.log("Buffering Status:", isBuffering);
+        setBuffering(isBuffering);
+        setLoading(isBuffering);
+        setIsPlaying(!isBuffering); 
+    };
+
+    const handleChannelChange = useCallback((channelUrl: string) => {
+        // console.log("Changing channel to:", channelUrl);
+        setLoading(true);
+        setError(false);
+        setPaused(false);
+        setIsPlaying(true);  
+        router.push({ pathname: "/PlayerScreen", params: { url: channelUrl } });
+    }, [router]);
+
+
     return (
         <View style={styles.container}>
 
-            {/* Video Player */}
             <View style={styles.videoContainer}>
                 {!url ? (
                     <Image
@@ -278,39 +307,63 @@ const PlayerScreen = () => {
                             <View style={styles.loaderContainer}>
                                 <ActivityIndicator size="large" color="#fff" />
                                 <Text style={styles.loadingText}>
-                                    {loading ? "Memuat Video..." : "Buffering..."}
+                                    {loading ? "Loading..." : "Buffering..."}
                                 </Text>
+
                             </View>
                         )}
-                        {error && !loading && (
-                            <View style={styles.errorContainer}>
-                                <Text style={styles.errorText}>Gagal Memuat Video. Coba Lagi!</Text>
-                            </View>
-                        )}
+                        {/* Video Player */}
                         <Video
-                            ref={videoRef}
+                            controlsStyles={{
+                                hidePosition: false,
+                                hidePlayPause: false,
+                                hideForward: false,
+                                hideRewind: false,
+                                hideNext: true,
+                                hidePrevious: true,
+                                hideFullscreen: false,
+                                hideSeekBar: false,
+                                hideDuration: false,
+                                hideNavigationBarOnFullScreenMode: true,
+                                hideNotificationBarOnFullScreenMode: true,
+                                hideSettingButton: false,
+                                liveLabel: "LIVE"
+                            }}
+                            ref={playerRef}
                             source={{
                                 uri: url,
-                                ...(drmConfig.type ? { drm: drmConfig } : {}),
                                 headers: drmConfig.headers || {},
                             }}
+                            drm={drmConfig.type ? {
+                                type: drmConfig.type === 'clearkey' ? DRMType.CLEARKKEY : DRMType.WIDEVINE,
+                                licenseServer: drmConfig.licenseServer,
+                                clearKeys: drmConfig.clearKeys ? JSON.parse(drmConfig.clearKeys) : undefined, // Parse clearKeys if it exists
+                            } : undefined}
                             style={styles.video}
-                            controls
+                            controls={true}
                             resizeMode="contain"
-                            paused={paused}
+                            onLoadStart={handleLoadStart}
                             onLoad={handleLoad}
                             onError={handleError}
                             onBuffer={handleBuffer}
-                            useTextureView={true}
-                            onFullscreenPlayerWillPresent={onFullscreenPlayerWillPresent}
-                            onFullscreenPlayerWillDismiss={onFullscreenPlayerWillDismiss}
+                            paused={paused || !isPlaying} 
+                            bufferConfig={{
+                                minBufferMs: 15000,
+                                maxBufferMs: 50000,
+                                bufferForPlaybackMs: 2500,
+                                bufferForPlaybackAfterRebufferMs: 5000,
+                                backBufferDurationMs: 120000,
+                                cacheSizeMB: 0,
+                                live: {
+                                    targetOffsetMs: 500,
+                                },
+                            }}
                         />
+
                     </>
                 )}
             </View>
-
             <Toast />
-
             {/* Program Sedang Tayang & Selanjutnya */}
             <View style={styles.programmeContainer}>
                 <View style={styles.programmeBox}>
@@ -359,7 +412,7 @@ const PlayerScreen = () => {
                     <FlatList
                         horizontal
                         data={upcomingProgrammes}
-                        keyExtractor={(item) => item.start}
+                        keyExtractor={(item, index) => `${item.start}-${index}`}
                         renderItem={({ item }) => (
                             <View style={styles.upcomingCard}>
                                 <Text style={styles.upcomingText}>{item.title || "Program tidak tersedia"}</Text>
@@ -412,32 +465,40 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: "#121212",
     },
-
     /** VIDEO PLAYER **/
     videoContainer: {
         width: "100%",
-        height: 250,
-        backgroundColor: "#000",
+        height: "40%",
+        backgroundColor: "rgba(1, 1, 3, 0.53)",
         justifyContent: "center",
         alignItems: "center",
-        marginTop: 20,
+
     },
     video: {
-        width: "100%",
-        height: "100%",
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        bottom: 0,
+        right: 0,
     },
+
     loaderContainer: {
         position: "absolute",
         top: "50%",
         left: "50%",
         transform: [{ translateX: -25 }, { translateY: -25 }],
         alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "rgba(0, 0, 0, 0.27)",
+        borderRadius: 10,
+        zIndex: 10,
     },
     loadingText: {
         marginTop: 10,
         color: "#fff",
         fontSize: 14,
         fontWeight: "bold",
+        textAlign: "center",
     },
     errorContainer: {
         position: "absolute",
@@ -454,7 +515,6 @@ const styles = StyleSheet.create({
         fontWeight: "bold",
         textAlign: "center",
     },
-
     /** PROGRAMME INFO **/
     programmeContainer: {
         marginTop: 10,
@@ -462,7 +522,7 @@ const styles = StyleSheet.create({
     },
     programmeBox: {
         flexDirection: "row",
-        backgroundColor: "#1e1e1e",
+        backgroundColor: "#2525",
         borderRadius: 10,
         padding: 10,
     },
@@ -484,7 +544,7 @@ const styles = StyleSheet.create({
         textAlign: "center",
     },
     programmeCard: {
-        backgroundColor: "#252525",
+        backgroundColor: "rgba(20, 17, 192, 0.47)",
         padding: 8,
         borderRadius: 8,
         alignItems: "center",
@@ -505,7 +565,6 @@ const styles = StyleSheet.create({
         fontSize: 12,
         textAlign: "center",
     },
-
     /** CHANNEL RECOMMENDATION **/
     recommendationContainer: {
         marginTop: 20,
@@ -524,7 +583,7 @@ const styles = StyleSheet.create({
         borderRadius: 10,
         width: 110,
         alignItems: "center",
-        shadowColor: "#000",
+        shadowColor: "#225",
         shadowOpacity: 0.2,
         shadowRadius: 4,
         elevation: 4,
@@ -547,7 +606,6 @@ const styles = StyleSheet.create({
         fontSize: 13,
         textAlign: "center",
     },
-
     /** UPCOMING PROGRAMMES **/
     upcomingContainer: {
         marginTop: 20,
@@ -586,4 +644,3 @@ const styles = StyleSheet.create({
 
 
 export default PlayerScreen;
-

@@ -3,7 +3,7 @@
     "name": "smart_tv",
     "slug": "smart_tv",
     "version": "1.0.0",
-    "orientation": "default",
+    "orientation": "potrait",
     "icon": "./assets/images/ic_launcher.png",
     "scheme": "myapp",
     "newArchEnabled": true,
@@ -33,6 +33,18 @@
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#000"
+        }
+      ],
+      [
+        "expo-screen-orientation",
+        {
+          "initialOrientation": "DEFAULT"
+        }
+      ],
+      [
+        "react-native-video",
+        {
+          "enableAndroidPictureInPicture": true,
         }
       ]
     ],

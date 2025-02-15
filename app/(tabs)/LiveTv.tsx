@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import { 
   View, FlatList, TouchableOpacity, Text, 
   StyleSheet, ImageBackground, ActivityIndicator 
@@ -13,8 +13,32 @@ const LiveTV = () => {
   const router = useRouter();
   const { channels, groups, loading, error } = useM3uParse(); 
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
+   const filteredChannels = useMemo(() => {
+    return selectedGroup ? channels.filter((ch) => ch.group === selectedGroup) : [];
+  }, [channels, selectedGroup]);
+  const renderChannelItem = useCallback(({ item }) => (
+    <LiveTVCard
+      channel={item}
+      onPress={() => router.push({ pathname: "/PlayerScreen", params: { url: item.url } })}
+    />
+  ), []);
 
-  const filteredChannels = selectedGroup ? channels.filter((ch: { group: string; }) => ch.group === selectedGroup) : [];
+  const renderGroupItem = useCallback(({ item }) => (
+    <TouchableOpacity
+      style={styles.groupCard}
+      onPress={() => setSelectedGroup(item)}
+      activeOpacity={0.8}
+    >
+      <ImageBackground
+        source={DEFAULT_CATEGORY_IMAGE}
+        style={styles.groupImage}
+        imageStyle={{ borderRadius: 15 }}
+      >
+        <View style={styles.overlay} />
+        <Text style={styles.groupText}>{item}</Text>
+      </ImageBackground>
+    </TouchableOpacity>
+  ), []);
 
   return (
     <View style={styles.container}>
@@ -35,39 +59,19 @@ const LiveTV = () => {
             numColumns={3} 
             keyExtractor={(item) => item.url}
             contentContainerStyle={styles.channelList}
-            renderItem={({ item }) => (
-              <LiveTVCard
-                channel={item}
-                onPress={() => router.push({ pathname: "/PlayerScreen", params: { url: item.url } })}
-              />
-            )}
+            renderItem={renderChannelItem}
           />
         </>
       ) : (
         <>
-         <Text style={{ color: "#fff", fontSize: 22, fontWeight: "bold", marginBottom: 10 , marginTop: 30, padding: 5 }}>🎥 LIVE TV GROUP</Text>
+          <Text style={styles.title}>🎥 LIVE TV GROUP</Text>
           <FlatList
             key="groupList"
             data={groups} 
             numColumns={3}
             keyExtractor={(item) => item}
             contentContainerStyle={styles.groupList}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.groupCard}
-                onPress={() => setSelectedGroup(item)}
-                activeOpacity={0.8}
-              >
-                <ImageBackground
-                source={ DEFAULT_CATEGORY_IMAGE }
-                  style={styles.groupImage}
-                  imageStyle={{ borderRadius: 15 }}
-                >
-                  <View style={styles.overlay} />
-                  <Text style={styles.groupText}>{item}</Text>
-                </ImageBackground>
-              </TouchableOpacity>
-            )}
+            renderItem={renderGroupItem}
           />
         </>
       )}
@@ -92,7 +96,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
   },
-
+  title: {
+    color: "#fff",
+    fontSize: 22,
+    fontWeight: "bold",
+    marginBottom: 10,
+    marginTop: 20,
+    padding: 5,
+    textAlign: "center",
+  },
   backButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -111,15 +123,14 @@ const styles = StyleSheet.create({
   },
   groupList: {
     paddingBottom: 10,
-   
   },
   groupCard: {
-    width: '30%',
+    width: "30%",
     margin: 5,
     borderRadius: 15,
-    overflow: 'hidden',
+    overflow: "hidden",
     height: 120,
-    backgroundColor: '#1E293B',
+    backgroundColor: "#1E293B",
     elevation: 2,
   },
   groupImage: {
@@ -134,11 +145,11 @@ const styles = StyleSheet.create({
   },
   groupText: {
     color: "#edec25",
-    fontSize: 10,
-    textDecorationLine: "underline",
+    fontSize: 12,
     fontWeight: "bold",
     textAlign: "center",
-    position: "absolute",
+    textTransform: "uppercase",
+    position: 'absolute',
     top: 2,
     left: 10,
     right: 10,
@@ -148,6 +159,5 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
 });
-
 
 export default LiveTV;
