@@ -1,7 +1,7 @@
-import React from "react";
-import { View, Text, Image, TouchableOpacity, StyleSheet } from "react-native";
+import React, { useState } from "react";
+import { View, Text, Image, TouchableOpacity, StyleSheet, ActivityIndicator } from "react-native";
 
-const defaultLogo = require("../assets/images/tv_banner.png");
+import defaultLogo from "../assets/images/tv_banner.png";
 
 export interface ChannelProps {
   channel: {
@@ -17,6 +17,9 @@ const truncateName = (name: string, limit: number) => {
 };
 
 const LiveTVCard: React.FC<ChannelProps> = ({ channel, onPress }) => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+
   return (
     <TouchableOpacity
       style={styles.cardContainer}
@@ -26,11 +29,22 @@ const LiveTVCard: React.FC<ChannelProps> = ({ channel, onPress }) => {
       accessibilityLabel={`Go to ${channel.name} channel`}
     >
       <View style={styles.imageContainer}>
+        {isLoading && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color="#edec25" />
+          </View>
+        )}
         <Image
-          source={channel.logo ? { uri: channel.logo } : defaultLogo}
-          defaultSource={defaultLogo} 
-          style={styles.image}
+          source={channel.logo && !hasError ? { uri: channel.logo } : defaultLogo}
+          defaultSource={defaultLogo}
+          style={[styles.image, isLoading && styles.hiddenImage]}
           resizeMode="cover"
+          onLoadStart={() => setIsLoading(true)}
+          onLoad={() => setIsLoading(false)}
+          onError={() => {
+            setHasError(true);
+            setIsLoading(false);
+          }}
         />
       </View>
       <Text style={styles.text} numberOfLines={1}>
@@ -75,6 +89,20 @@ const styles = StyleSheet.create({
     color: "#fff",
     textAlign: "center",
     paddingHorizontal: 5,
+  },
+  loadingContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#333',
+    zIndex: 1,
+  },
+  hiddenImage: {
+    opacity: 0,
   },
 });
 

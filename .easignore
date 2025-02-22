@@ -1,23 +1,8 @@
-# Node modules dan cache
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+# Copy everything from your .gitignore file here
 
+# Additional ignores specific to EAS builds
 
-# Folder sistem & konfigurasi IDE
-.vscode/
-.idea/
-*.iml
+# Ignore native directories (if you are using EAS Build)
+/android
+/ios
 
-# Folder sementara Expo
-.expo/
-.expo-shared/
-
-# Direktori bawaan React Native & Expo
-
-android/app/build/
-
-# File log & cache
-*.log
-*.temp

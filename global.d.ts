@@ -51,8 +51,6 @@ export interface Channel {
   referrer: string | null;
 }
 
-declare module 'react-native-base64';
-
 interface Programme {
   start: string;
   stop: string;

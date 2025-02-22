@@ -1,27 +1,56 @@
-import React, { useState, useMemo, useCallback } from "react";
-import { 
-  View, FlatList, TouchableOpacity, Text, 
-  StyleSheet, ImageBackground, ActivityIndicator 
+import React, { useState, useMemo, useCallback, useEffect } from "react";
+import {
+  View,
+  FlatList,
+  TouchableOpacity,
+  Text,
+  StyleSheet,
+  ImageBackground,
+  RefreshControl,
+  SafeAreaView,
 } from "react-native";
 import { useRouter } from "expo-router";
 import useM3uParse from "../../hooks/M3uParse";
 import LiveTVCard from "../../components/LiveTVCard";
 import Colors from "../../constants/Colors";
 import DEFAULT_CATEGORY_IMAGE from "../../assets/images/maskable.png";
+import { useNavigation } from "@react-navigation/native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import LottieView from 'lottie-react-native';  
 
 const LiveTV = () => {
   const router = useRouter();
-  const { channels, groups, loading, error } = useM3uParse(); 
+  const navigation = useNavigation();
+  const { channels, groups, loading, error, refetch } = useM3uParse();
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
-   const filteredChannels = useMemo(() => {
+  const [refreshing, setRefreshing] = useState(false);
+
+  const filteredChannels = useMemo(() => {
     return selectedGroup ? channels.filter((ch) => ch.group === selectedGroup) : [];
   }, [channels, selectedGroup]);
+
+  const hideTabBar = useCallback(() => {
+    navigation.getParent()?.setOptions({
+      tabBarStyle: { display: "none" },
+    });
+  }, [navigation]);
+
+  const showTabBar = useCallback(() => {
+    navigation.getParent()?.setOptions({
+      tabBarStyle: undefined,
+    });
+  }, [navigation]);
+
   const renderChannelItem = useCallback(({ item }) => (
     <LiveTVCard
       channel={item}
-      onPress={() => router.push({ pathname: "/PlayerScreen", params: { url: item.url } })}
+      onPress={() => {
+        hideTabBar();
+        navigation.navigate('PlayerScreen', { url: item.url });  
+      }}
     />
-  ), []);
+  ), [hideTabBar, navigation]);
+  
 
   const renderGroupItem = useCallback(({ item }) => (
     <TouchableOpacity
@@ -40,26 +69,68 @@ const LiveTV = () => {
     </TouchableOpacity>
   ), []);
 
+  const { top } = useSafeAreaInsets(); 
+
+  useEffect(() => {
+    return () => {
+      showTabBar();
+    };
+  }, [showTabBar]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      refetch();
+    } catch (error) {
+      console.error("Error refreshing:", error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetch]);
+
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.primary} />
+          <LottieView
+            source={require("../../assets/animations/loading.json")} 
+            autoPlay
+            loop
+            style={styles.lottie}
+          />
           <Text style={styles.loadingText}>Memuat saluran TV...</Text>
+        </View>
+      ) : error ? (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Error: {error.message}</Text>
         </View>
       ) : selectedGroup ? (
         <>
-          <TouchableOpacity style={styles.backButton} onPress={() => setSelectedGroup(null)}>
+          <TouchableOpacity
+            style={[styles.backButton, { marginTop: top + 10 }]} 
+            onPress={() => {
+              setSelectedGroup(null);
+              showTabBar();
+            }}
+          >
             <Text style={styles.backText}>← Kembali</Text>
           </TouchableOpacity>
 
           <FlatList
-            key={`channels-${selectedGroup}`} 
+            key={`channels-${selectedGroup}`}
             data={filteredChannels}
-            numColumns={3} 
+            numColumns={3}
             keyExtractor={(item) => item.url}
             contentContainerStyle={styles.channelList}
             renderItem={renderChannelItem}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                colors={[Colors.primary]}
+                tintColor={Colors.primary}
+              />
+            }
           />
         </>
       ) : (
@@ -67,15 +138,23 @@ const LiveTV = () => {
           <Text style={styles.title}>🎥 LIVE TV GROUP</Text>
           <FlatList
             key="groupList"
-            data={groups} 
+            data={groups}
             numColumns={3}
             keyExtractor={(item) => item}
             contentContainerStyle={styles.groupList}
             renderItem={renderGroupItem}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                colors={[Colors.primary]}
+                tintColor={Colors.primary}
+              />
+            }
           />
         </>
       )}
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -96,6 +175,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
   },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   title: {
     color: "#fff",
     fontSize: 22,
@@ -111,7 +195,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 10,
     backgroundColor: Colors.primary,
-    marginTop: 20,
     borderRadius: 10,
     alignSelf: "flex-start",
     marginBottom: 15,
@@ -157,6 +240,10 @@ const styles = StyleSheet.create({
   channelList: {
     justifyContent: "center",
     paddingBottom: 10,
+  },
+  lottie: {
+    width: 200,
+    height: 200,
   },
 });
 
