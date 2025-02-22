@@ -468,7 +468,7 @@ const styles = StyleSheet.create({
     },
     flatlistContentContainer: {
         paddingTop: 10,
-        paddingBottom: 20,
+        paddingBottom: 10,
     },
     separator: {
         height: 5,
@@ -545,7 +545,7 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
         marginBottom: 15,
-        overflow: 'hidden', // Important for the image to respect the borderRadius
+        overflow: 'hidden', 
     },
     chooseImagePreview: {
         width: '100%',
