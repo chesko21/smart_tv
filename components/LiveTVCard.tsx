@@ -11,7 +11,13 @@ export interface ChannelProps {
   };
   onPress: () => void;
 }
-
+export interface Channel {
+  name: string;
+  group: string;
+  url: string;
+  logo?: string;
+  tvgId?: string;
+}
 const truncateName = (name: string, limit: number) => {
   return name.length > limit ? `${name.substring(0, limit)}...` : name;
 };

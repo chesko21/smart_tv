@@ -4,6 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import Colors from "../../constants/Colors";
 import useM3uParse from "../../hooks/M3uParse";
 import tvBanner from "../../assets/images/tv_banner.png";
+import { usePip } from '../../contexts/PipContext';
 
 const { width, height } = Dimensions.get("window");
 
@@ -13,7 +14,7 @@ const getRandomChannels = (channels: any, num = 10) => {
 };
 
 export default function Home() {
-  const { channels, loading, refreshM3u: refreshM3uHook, fetch } = useM3uParse();
+  const { channels, loading, refetch } = useM3uParse();
   const [isLoading, setIsLoading] = useState(true);
   const [errorImages, setErrorImages] = useState < { [key: string]: boolean } > ({});
   const [refreshing, setRefreshing] = useState(false);
@@ -21,8 +22,8 @@ export default function Home() {
   const shimmerAnim = useRef(new Animated.Value(0)).current;
   const fadeInAnim = useRef(new Animated.Value(0)).current;
   const [slideshowData, setSlideshowData] = useState < any[] > ([]);
-  const [radioData, setRadioData] = useState < any[] > ([]);
   const [activeSlide, setActiveSlide] = useState(0);
+  const { setPipMode } = usePip();
 
   const [limitedSports, setLimitedSports] = useState < any[] > ([]);
   const [limitedRadio, setLimitedRadio] = useState < any[] > ([]);
@@ -32,10 +33,8 @@ export default function Home() {
     setRefreshing(true);
     try {
     
-      if (refreshM3uHook) {
-        await refreshM3uHook();
-      } else if (fetch) {
-        await fetch();
+      if (refetch) {
+        await refetch();
       }
 
       if (filteredSports.length > 0) {
@@ -84,7 +83,10 @@ export default function Home() {
   }, []);
 
   const filteredSports = useMemo(() => {
-    const sportsKeywords = ["sport", "sports", "olahraga", "bola", "liga", "UCL", "league", "champions", "cup", "ufc"];
+    const sportsKeywords = ["sport", "sports", "olahraga", "bola", "liga", "UCL", "league", 
+      "champions", "cup", "ufc", "timnas" , "Volly" , "voli" , "basket", "pptv",
+
+    ];
     return channels.filter((channel) =>
       sportsKeywords.some((keyword) => channel.group?.toLowerCase()?.includes(keyword))
     );
@@ -99,20 +101,20 @@ export default function Home() {
 
   useEffect(() => {
     if (filteredSports.length > 0) {
-      setLimitedSports(getRandomChannels(filteredSports, 20));
-      setSlideshowData(getRandomChannels(filteredSports, 20));
+      setLimitedSports(getRandomChannels(filteredSports, 40));
+      setSlideshowData(getRandomChannels(filteredSports, 40));
     } else {
       setLimitedSports([]);
       setSlideshowData([]);
     }
     if (filteredRadio.length > 0) {
-      setLimitedRadio(getRandomChannels(filteredRadio, 20));
+      setLimitedRadio(getRandomChannels(filteredRadio, 40));
     } else {
       setLimitedRadio([]);
     }
 
     if (channels && channels.length > 0) {
-      setRecommendations(getRandomChannels(channels, 20));
+      setRecommendations(getRandomChannels(channels, 40));
     }
 
   }, [filteredSports, filteredRadio, channels]);
@@ -130,17 +132,17 @@ export default function Home() {
   const handleImageError = (url: string) => {
     setErrorImages((prev) => ({ ...prev, [url]: true }));
   };
-  const renderSlideshowItem = ({ item }) => (
+  const renderSlideshowItem = ({ item }: { item: { url: string; logo?: string; name: string } }) => (
     <TouchableOpacity
       style={styles.slide}
       onPress={() => navigation.navigate('PlayerScreen', { url: item.url })}
     >
       <Image
-        source={errorImages[item.url] ? tvBanner : { uri: item.logo }}
+        source={item.logo ? { uri: item.logo } : tvBanner}
         style={styles.slideImage}
         onError={() => handleImageError(item.url)}
+        defaultSource={tvBanner}
       />
-
       <Text style={styles.slideText}>{item.name}</Text>
     </TouchableOpacity>
   );
@@ -235,13 +237,13 @@ export default function Home() {
           style={styles.navButton}
           onPress={() => navigation.navigate("LiveTvScreen")}
         >
-          <Text style={styles.navText}>Watch Live TV</Text>
+          <Text style={styles.navtext}>Watch Live TV</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.navButton}
           onPress={() => navigation.navigate("VodScreen")}
         >
-          <Text style={styles.navText}>Watch VOD</Text>
+          <Text style={styles.navtext}>Watch VOD</Text>
         </TouchableOpacity>
       </View>
 
@@ -271,51 +273,58 @@ export default function Home() {
 
       <Text style={styles.sectionTitle}>Rekomendasi Untuk Anda</Text>
       <FlatList
-        data={recommendations}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        keyExtractor={(item, index) => `${item.url || item.tvgId || item.name}-${index}`}
-        renderItem={({ item }) => (
-          !item || !item.name ? null : (
-            <TouchableOpacity
-              style={styles.card}
-              onPress={() => navigation.navigate('PlayerScreen', { url: item.url })}
-            >
-              <Image
-                source={errorImages[item.url] ? tvBanner : { uri: item.logo }}
-                style={styles.cardImage}
-                onError={() => handleImageError(item.url)}
-              />
-              <Text style={styles.cardText}>{truncate(item.name, 10)}</Text>
-            </TouchableOpacity>
-          )
-          )
-        }
-      />
+  data={recommendations}
+  horizontal
+  showsHorizontalScrollIndicator={false}
+  keyExtractor={(item, index) => `${item.url || item.tvgId || item.name}-${index}`}
+  renderItem={({ item }) => (
+    !item || !item.name ? null : (
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() => {
+          setPipMode(false); // Set PiP mode to normal
+          navigation.navigate('PlayerScreen', { url: item.url });
+        }}
+      >
+        <Image
+          source={item.logo ? { uri: item.logo } : tvBanner}
+          style={styles.cardImage}
+          onError={() => handleImageError(item.url)}
+          defaultSource={tvBanner}
+        />
+        <Text style={styles.cardText}>{truncate(item.name, 10)}</Text>
+      </TouchableOpacity>
+    )
+  )}
+/>
+
 
       <Text style={styles.sectionTitle}>Radio Player</Text>
       <FlatList
-        data={limitedRadio}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        keyExtractor={(item) => item.url}
-        renderItem={({ item }) => (
-          !item || !item.name ? null : (
-            <TouchableOpacity
-              style={styles.card}
-              onPress={() => navigation.navigate('PlayerScreen', { url: item.url })}
-            >
-              <Image
-                source={errorImages[item.url] ? tvBanner : { uri: item.logo }}
-                style={styles.cardImage}
-                onError={() => handleImageError(item.url)}
-              />
-              <Text style={styles.cardText}>{truncate(item.name, 10)}</Text>
-            </TouchableOpacity>
-          )
-          )
-        }
-      />
+  data={limitedRadio}
+  horizontal
+  showsHorizontalScrollIndicator={false}
+  keyExtractor={(item) => item.url}
+  renderItem={({ item }) => (
+    !item || !item.name ? null : (
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() => {
+          setPipMode(false); // Set PiP mode to normal
+          navigation.navigate('PlayerScreen', { url: item.url });
+        }}
+      >
+        <Image
+          source={item.logo ? { uri: item.logo } : tvBanner}
+          style={styles.cardImage}
+          onError={() => handleImageError(item.url)}
+          defaultSource={tvBanner}
+        />
+        <Text style={styles.cardText}>{truncate(item.name, 10)}</Text>
+      </TouchableOpacity>
+    )
+  )}
+/>
     </Animated.ScrollView>
   );
 }
@@ -364,7 +373,7 @@ const styles = StyleSheet.create({
     alignItems:'center'
 },
 navtext: {
-  fontSize: 24,
+  fontSize: 18,
   fontWeight: '700',
 },
 skeletonNavButton:{

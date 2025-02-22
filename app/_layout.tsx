@@ -8,15 +8,14 @@ import LottieView from "lottie-react-native";
 import loadingAnimation from "../assets/animations/loading.json";
 import DrawerNavigator from "./(tabs)/DrawerNavigator";
 import { Ionicons } from '@expo/vector-icons';
+import { PipProvider } from '../contexts/PipContext';
+import FloatingPipPlayer from '../components/FloatingPipPlayer';
 
-// Get screen dimensions
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// Base dimensions (you can adjust these based on your design)
-const baseWidth = 375; // Standard iPhone width
-const baseHeight = 812; // Standard iPhone height
+const baseWidth = 375; 
+const baseHeight = 812; 
 
-// Scaling utilities
 const scale = SCREEN_WIDTH / baseWidth;
 const verticalScale = SCREEN_HEIGHT / baseHeight;
 const moderateScale = (size: number, factor = 0.5) => size + (scale - 1) * factor;
@@ -30,7 +29,6 @@ export default function Layout() {
         screen: Dimensions.get('screen'),
     });
 
-    // Handle dimension changes
     useEffect(() => {
         const subscription = Dimensions.addEventListener('change', ({ window, screen }) => {
             setDimensions({ window, screen });
@@ -77,7 +75,7 @@ export default function Layout() {
                 NavigationBar.setVisibilityAsync("visible");
             };
         }
-        // Allow both portrait and landscape orientations
+
         ScreenOrientation.unlockAsync();
     }, []);
 
@@ -98,12 +96,12 @@ export default function Layout() {
         );
     }
 
-    const bannerTopPosition = Platform.OS === 'ios' ? 
-        dimensions.window.height * 0.05 : // 5% from top on iOS
-        0; // 0 for Android
+    const bannerTopPosition = Platform.OS === 'android' ? 
+        dimensions.window.height * 0.05 :
+        0;
 
     return (
-        <>
+        <PipProvider>
             <StatusBar style="light" translucent={true} backgroundColor="transparent" hidden={!isOnline} />  
             <SafeAreaView style={styles.safeArea}>
                 {!isOnline && (
@@ -133,8 +131,9 @@ export default function Layout() {
                     </View>
                 )}
                 <DrawerNavigator />
+                <FloatingPipPlayer />
             </SafeAreaView>
-        </>
+        </PipProvider>
     );
 }
 
@@ -145,7 +144,7 @@ const styles = StyleSheet.create({
     },
     loadingContainer: {
         flex: 1,
-        backgroundColor: "black",
+        backgroundColor: "#000",
         justifyContent: "center",
         alignItems: "center",
     },

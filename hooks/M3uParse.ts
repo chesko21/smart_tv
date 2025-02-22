@@ -9,13 +9,13 @@ export interface VideoTrack {
     trackId: string;
     selected: boolean;
 }
-  
+
 export interface Channel {
     tvgId: string | null;
     name: string;
     url: string;
     group: string;
-    logo?: string;
+    logo: string | null;
     license_type: string;
     license_key: string | null;
     userAgent: string;
@@ -72,7 +72,7 @@ const useM3uParse = () => {
                 ...parsedUserUrls,
             ];
 
-            console.log("📡 Fetching M3U data from:", allUrls);
+         //   console.log("📡 Fetching M3U data from:", allUrls);
             let allChannels: Channel[] = [];
 
             for (const url of allUrls) {

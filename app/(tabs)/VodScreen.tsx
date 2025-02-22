@@ -18,6 +18,7 @@ import useM3uParse from "../../hooks/M3uParse";
 import tvBanner from "../../assets/images/tv_banner.png";
 import { useNavigation, NavigationProp } from "@react-navigation/native";
 import LottieView from "lottie-react-native";
+import { usePip } from '../../contexts/PipContext';
 
 const { width } = Dimensions.get("window");
 
@@ -30,6 +31,7 @@ interface ErrorState {
 }
 
 const Vod = () => {
+  const { setPipMode } = usePip();
   const router = useRouter();
   const { channels, loading, refetch, error } = useM3uParse();
   const [refreshing, setRefreshing] = useState(false);
@@ -62,6 +64,7 @@ const Vod = () => {
     "series", "tv series", "drama series", "web series",
     "season", "episode", "show", "tv show", "reality show",
     "netflix", "disney", "prime", "hbo", "hulu", "apple tv", "komedi", "lk21", "ftv", 
+    "hiburan"
   ].map(keyword => keyword.toLowerCase());
 
   useEffect(() => {
@@ -114,9 +117,12 @@ const Vod = () => {
 
       return (
         <TouchableOpacity
-          style={styles.slideItem}
-          onPress={() => navigation.navigate("PlayerScreen", { url: item.url })}
-        >
+      style={styles.card}
+      onPress={() => {
+        setPipMode(false); // Set PiP mode to normal
+        navigation.navigate('PlayerScreen', { url: item.url });
+      }}
+    >
           <View style={styles.slideImageContainer}>
             {isItemLoading && (
               <View style={styles.loadingContainer}>
@@ -161,7 +167,10 @@ const Vod = () => {
       return (
         <TouchableOpacity
           style={styles.card}
-          onPress={() => navigation.navigate("PlayerScreen", { url: item.url })}
+          onPress={() => {
+            setPipMode(false); 
+            navigation.navigate('PlayerScreen', { url: item.url });
+          }}
         >
           <View style={styles.imageContainer}>
             {isItemLoading && (
@@ -258,6 +267,8 @@ const styles = StyleSheet.create({
   loadingAnimation: {
     width: 200,
     height: 200,
+    justifyContent: "center",
+    alignItems: "center",
   },
   loadingText: {
     marginTop: 20,

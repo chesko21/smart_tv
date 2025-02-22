@@ -24,13 +24,13 @@ const quickMenuItems = [
     icon: "https://thumbor.prod.vidiocdn.com/nM7ycXrJE1IJrhU3dtEP8R2tzII=/168x168/...",
     link: "/LiveTv",
   },
-  // Add more menu items as needed
+
 ];
 
 const QuickMenu = ({ isFullScreen }) => {
   const router = useRouter();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [menuPosition, setMenuPosition] = useState(new Animated.Value(0)); // 0: closed, 1: open
+  const [menuPosition, setMenuPosition] = useState(new Animated.Value(0)); 
   const [menuWidth, setMenuWidth] = useState(0);
 
   const screenWidth = Dimensions.get("window").width;
@@ -100,24 +100,24 @@ const QuickMenu = ({ isFullScreen }) => {
         {
           transform: [{ translateX: menuTranslateX }],
           width: menuWidth,
-          //position: 'absolute', // Changed back to absolute
-          top: isFullScreen ? 50 : 10, // Adjust top based on fullscreen
-          right: 0, // Menu slides from the right
-          zIndex: 10,  // Ensure it's above other content.
-          opacity: isMenuOpen ? 1 : 0,  // Added opacity
-          // Remove overflow: 'hidden',  // Removed overflow
+          //position: 'absolute',
+          top: isFullScreen ? 50 : 10, 
+          right: 0, 
+          zIndex: 10, 
+          opacity: isMenuOpen ? 1 : 0, 
+           
         },
       ]}
       {...panResponder.panHandlers}
     >
-      {/* Add a button or area to close/open the menu */}
+     
       <TouchableOpacity style={styles.menuHeader} onPress={toggleMenu}>
         <Text style={styles.menuHeaderText}>{isMenuOpen ? "Tutup" : "Menu"}</Text>
       </TouchableOpacity>
       {isMenuOpen && (
         <FlatList
           data={quickMenuItems}
-          numColumns={4} // Adjust as needed
+          numColumns={4}
           keyExtractor={(item, index) => String(index)}
           renderItem={({ item }) => (
             <TouchableOpacity
@@ -136,13 +136,9 @@ const QuickMenu = ({ isFullScreen }) => {
 
 const styles = StyleSheet.create({
   menuContainer: {
-    backgroundColor: "rgba(0, 0, 0, 0.8)", // Semi-transparent background
+    backgroundColor: "rgba(0, 0, 0, 0.8)",
     borderRadius: 8,
-    // padding: 10, // Removed because it's not needed
-    // width: 300, // Set the width to the desired value
-    // position: "absolute", // Keep absolute for overlay
-    // top: 20, // Adjusted for fullscreen
-    // right: 20,  // Menu slides from the right
+    
 
   },
   menuHeader: {
@@ -159,7 +155,7 @@ const styles = StyleSheet.create({
   menuItem: {
     alignItems: "center",
     margin: 5,
-    width: 80, // or dynamic value
+    width: 80,
   },
   menuIcon: {
     width: 60,

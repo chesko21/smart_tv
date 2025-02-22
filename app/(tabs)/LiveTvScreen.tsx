@@ -17,6 +17,7 @@ import DEFAULT_CATEGORY_IMAGE from "../../assets/images/maskable.png";
 import { useNavigation } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import LottieView from 'lottie-react-native';  
+import { usePip } from '../../contexts/PipContext';
 
 const LiveTV = () => {
   const router = useRouter();
@@ -24,6 +25,7 @@ const LiveTV = () => {
   const { channels, groups, loading, error, refetch } = useM3uParse();
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const { setPipMode } = usePip();
 
   const filteredChannels = useMemo(() => {
     return selectedGroup ? channels.filter((ch) => ch.group === selectedGroup) : [];
@@ -46,10 +48,12 @@ const LiveTV = () => {
       channel={item}
       onPress={() => {
         hideTabBar();
-        navigation.navigate('PlayerScreen', { url: item.url });  
+        setPipMode(false); 
+        navigation.navigate('PlayerScreen', { url: item.url });
       }}
     />
-  ), [hideTabBar, navigation]);
+  ), [hideTabBar, navigation, setPipMode]);
+
   
 
   const renderGroupItem = useCallback(({ item }) => (

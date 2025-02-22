@@ -38,20 +38,26 @@ interface StreamConfig {
 
 const configureDrm = (channel: any): DrmConfig => {
     if (!channel) return {};
-  
+
+    const drmConfig: DrmConfig = {};
+
     if (channel.license_type?.includes("clearkey") && channel.license_key) {
         const [kidHex, keyHex] = channel.license_key.split(":");
         if (!kidHex || !keyHex) {
             console.error("Invalid KID or Key for ClearKey DRM.");
             return {};
         }
-        const kidBase64 = Buffer.from(kidHex, "hex").toString("base64").replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
-        const keyBase64 = Buffer.from(keyHex, "hex").toString("base64").replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
-  
-        return {
-            type: "clearkey",
-            clearKeys: JSON.stringify({ keys: [{ kty: "oct", kid: kidBase64, k: keyBase64 }] }),
-        };
+        drmConfig.type = "clearkey";
+        drmConfig.clearKeys = JSON.stringify({
+            keys: [
+                {
+                    kty: "oct",
+                    alg: "A128KW",
+                    kid: Buffer.from(kidHex, "hex").toString("base64"),
+                    k: Buffer.from(keyHex, "hex").toString("base64"),
+                },
+            ],
+        });
     } else if (channel.license_type?.includes("widevine") && channel.license_key) {
         return {
             type: "widevine",
@@ -63,31 +69,43 @@ const configureDrm = (channel: any): DrmConfig => {
             licenseServer: channel.license_key.trim(),
         };
     }
-    return {};
+    return drmConfig;
 };
 
+
 const detectStreamType = (url: string): StreamConfig => {
-    const isHLS = url.includes('.m3u8');
-    const isRadio = url.includes('.pls') || url.includes('.m3u') || url.includes('audio/');
-    const mimeType = isHLS ? 'application/vnd.apple.mpegurl' : 
-                    isRadio ? 'audio/mp3' : 'video/mp4';
-    
+    const isHLS = /\.(m3u8|m3u|ts)($|\?)|\/manifest\/|\/playlist\/|\/master\./i.test(url);
+    const isRadio = /\.(pls|mp3|aac|ogg)($|\?)|audio\//i.test(url);
+
+    const mimeType = isHLS ? 'application/x-mpegURL' :
+        isRadio ? 'audio/mp3' : 'video/mp4';
+
     return { isHLS, isRadio, mimeType };
 };
 
+
 interface VideoPlayerProps {
+
     url: string;
-    channel: any;
+
+    channel: Channel;
+
+    onLoadStart: () => void;
+
+    onLoad: () => void;
+
+    onError: () => void;
+
     paused: boolean;
-    onLoadStart?: () => void;
-    onLoad?: () => void;
-    onError?: (error: any) => void;
-    onBuffer?: ({ isBuffering }: { isBuffering: boolean }) => void;
-    style?: object;
-    maxHeight?: number;
-    onRefresh?: () => void;
+
+    style?: ViewStyle;
+
     onPipModeChange?: (isInPipMode: boolean) => void;
+
+    isPipEnabled?: boolean;
+
 }
+
 
 const VideoPlayer: React.FC<VideoPlayerProps> = ({
     url,
@@ -110,26 +128,26 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const [buffering, setBuffering] = useState(false);
     const [error, setError] = useState(false);
     const [showControls, setShowControls] = useState(true);
-    const [videoTracks, setVideoTracks] = useState<any[]>([]);
-    const [selectedTrack, setSelectedTrack] = useState<number | null>(null);
+    const [videoTracks, setVideoTracks] = useState < any[] > ([]);
+    const [selectedTrack, setSelectedTrack] = useState < number | null > (null);
     const [refreshing, setRefreshing] = useState(false);
-    const [drmConfig, setDrmConfig] = useState<DrmConfig>({});
+    const [drmConfig, setDrmConfig] = useState < DrmConfig > ({});
     const [showResolutionModal, setShowResolutionModal] = useState(false);
     const [isPlaying, setIsPlaying] = useState(true);
     const [showQualityButton, setShowQualityButton] = useState(true);
-    const [availableResolutions, setAvailableResolutions] = useState<number[]>([]);
-    const [selectedResolution, setSelectedResolution] = useState<number | null>(null);
+    const [availableResolutions, setAvailableResolutions] = useState < number[] > ([]);
+    const [selectedResolution, setSelectedResolution] = useState < number | null > (null);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [isInPipMode, setIsInPipMode] = useState(false);
-    const [streamConfig, setStreamConfig] = useState<StreamConfig>({
+    const [streamConfig, setStreamConfig] = useState < StreamConfig > ({
         isHLS: false,
         isRadio: false,
         mimeType: null
     });
-  
-    const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-    const qualityButtonTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
+
+    const controlsTimeoutRef = useRef < NodeJS.Timeout | null > (null);
+    const qualityButtonTimeoutRef = useRef < NodeJS.Timeout | null > (null);
+
     useEffect(() => {
         if (channel) {
             setDrmConfig(configureDrm(channel));
@@ -165,7 +183,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
         const resolutions = onLoadData.videoTracks
             ?.map((track: { height: any; }) => track.height)
-            .filter((height: any): height is number => !!height)
+            .filter((height) => !!height)
             .sort((a, b) => b - a) || [];
         setAvailableResolutions(resolutions);
 
@@ -261,13 +279,29 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     };
 
     const enterPipMode = () => {
-        if (Platform.OS === 'android' && playerRef.current) {
-            playerRef.current.enterPictureInPicture();
+        if (Platform.OS === 'android') {
+            setIsInPipMode(true);
+            setIsPlaying(false);
+            onPipModeChange?.(true);
         }
     };
 
+    const exitPipMode = () => {
+        setIsInPipMode(false);
+        setIsPlaying(true);
+        onPipModeChange?.(false);
+    }
+
+    useEffect(() => {
+        return () => {
+            if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+            if (qualityButtonTimeoutRef.current) clearTimeout(qualityButtonTimeoutRef.current);
+        };
+    }, []);
+
     const handlePipModeChange = (event: { isInPictureInPictureMode: boolean }) => {
         setIsInPipMode(event.isInPictureInPictureMode);
+        setIsPlaying(!event.isInPictureInPictureMode);
         onPipModeChange?.(event.isInPictureInPictureMode);
     };
 
@@ -277,18 +311,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 enterPipMode();
             }
         });
-      
+
         return () => {
             subscription.remove();
         };
     }, [isInPipMode]);
-
-    useEffect(() => {
-        return () => {
-            if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
-            if (qualityButtonTimeoutRef.current) clearTimeout(qualityButtonTimeoutRef.current);
-        };
-    }, []);
 
     const getQualityBadge = (resolution: number) => {
         if (resolution >= 720) return 'HD';
@@ -298,155 +325,160 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     return (
         <>
-        <StatusBar backgroundColor="#000" barStyle="light-content" />
-        <ScrollView
-            contentContainerStyle={styles.scrollViewContent}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-        >
-            <View style={[styles.videoContainer, { width: videoWidth, height: videoHeight }, style]}>
-                <TouchableOpacity style={styles.touchableArea} activeOpacity={1} onPress={handleUserInteraction}>
-                    <Video
-                        ref={playerRef}
-                        source={{
-                            uri: url,
-                            drm: drmConfig.type ? drmConfig : undefined,
-                            type: streamConfig.isHLS ? 'm3u8' : undefined,
-                            headers: {
-                                'Content-Type': streamConfig.mimeType || 'video/mp4'
-                            }
-                        }}
-                        style={streamConfig.isRadio ? styles.audioPlayer : styles.video}
-                        audioOnly={streamConfig.isRadio}
-                        playInBackground={streamConfig.isRadio}
-                        ignoreSilentSwitch={streamConfig.isRadio ? "ignore" : "obey"}
-                        progressUpdateInterval={1000}
-                        onError={(error) => {
-                            console.error('Playback Error:', error);
-                            handleError(error);
-                        }}
-                        resizeMode="contain"
-                        onLoadStart={handleLoadStart}
-                        onLoad={handleLoad}
-                        onError={handleError}
-                        onBuffer={handleBuffer}
-                        paused={!isPlaying}
-                        controls={false}
-                        onFullscreenPlayerWillPresent={() => setIsFullscreen(true)}
-                        onFullscreenPlayerWillDismiss={() => setIsFullscreen(false)}
-                        selectedVideoTrack={{ type: selectedResolution ? "resolution" : "auto", value: selectedResolution || undefined }}
-                        pictureInPicture={true}
-                        onPictureInPictureStatusChanged={handlePipModeChange} />
-                </TouchableOpacity>
+            <StatusBar backgroundColor="#000" barStyle="light-content" />
+            <ScrollView
+                contentContainerStyle={styles.scrollViewContent}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+            >
+                <View style={[styles.videoContainer, { width: videoWidth, height: videoHeight }, style]}>
+                    <TouchableOpacity style={styles.touchableArea} activeOpacity={1} onPress={handleUserInteraction}>
+                        <Video
+                            ref={playerRef}
+                            source={{
+                                uri: url,
+                                type: streamConfig.isHLS ? 'm3u8' : undefined,
+                                drm: drmConfig.type ? drmConfig : undefined,
+                            }}
+                            style={streamConfig.isRadio ? styles.audioPlayer : styles.video}
+                            audioOnly={streamConfig.isRadio}
+                            playInBackground={streamConfig.isRadio}
+                            ignoreSilentSwitch={streamConfig.isRadio ? "ignore" : "obey"}
+                            progressUpdateInterval={1000}
+                            onError={(error) => {
+                                console.error('Playback Error:', error);
+                                handleError(error);
+                            }}
+                            resizeMode="contain"
+                            onLoadStart={handleLoadStart}
+                            onLoad={handleLoad}
+                            onBuffer={handleBuffer}
+                            paused={!isPlaying}
+                            controls={false}
+                            onFullscreenPlayerWillPresent={() => setIsFullscreen(true)}
+                            onFullscreenPlayerWillDismiss={() => setIsFullscreen(false)}
+                            selectedVideoTrack={{ type: selectedResolution ? "resolution" : "auto", value: selectedResolution || undefined }}
+                            pictureInPicture={true}
+                            onPictureInPictureStatusChanged={handlePipModeChange}
+                        />
+                    </TouchableOpacity>
 
-                {showControls && (
-                    <View style={styles.customControls}>
-                        <TouchableOpacity onPress={togglePlay} style={styles.controlButton}>
-                            <Icon name={isPlaying ? "pause" : "play-arrow"} size={24} color="#FFF" />
-                        </TouchableOpacity>
+                    {showControls && (
+                        <View style={styles.customControls}>
+                            <TouchableOpacity onPress={togglePlay} style={styles.controlButton}>
+                                <Icon name={isPlaying ? "pause" : "play-arrow"} size={24} color="#FFF" />
+                            </TouchableOpacity>
 
-                        <View style={styles.rightControls}>
-                            {Platform.OS === 'android' && (
-                                <TouchableOpacity onPress={enterPipMode} style={styles.controlButton}>
-                                    <Icon name="picture-in-picture-alt" size={24} color="#FFF" />
+                            <View style={styles.rightControls}>
+                                {Platform.OS === 'android' && (
+                                    <TouchableOpacity
+                                        onPress={isInPipMode ? exitPipMode : enterPipMode}
+                                        style={styles.controlButton}
+                                    >
+                                        <Icon
+                                            name={isInPipMode ? "picture-in-picture-alt" : "picture-in-picture-alt"}
+                                            size={24}
+                                            color="#FFF"
+                                        />
+                                    </TouchableOpacity>
+                                )}
+                                <TouchableOpacity onPress={() => {
+                                    setShowResolutionModal(true);
+                                    setShowQualityButton(true);
+                                    resetQualityButtonTimer();
+                                }}>
+                                    <Icon name="settings" size={24} color="#FFF" />
                                 </TouchableOpacity>
-                            )}
-                            <TouchableOpacity onPress={() => {
-                                setShowResolutionModal(true);
-                                setShowQualityButton(true);
-                                resetQualityButtonTimer();
-                            } }>
-                                <Icon name="settings" size={24} color="#FFF" />
-                            </TouchableOpacity>
 
-                            <TouchableOpacity onPress={toggleFullscreen} style={styles.controlButton}>
-                                <Icon name={isFullscreen ? "fullscreen-exit" : "fullscreen"} size={24} color="#FFF" />
-                            </TouchableOpacity>
+                                <TouchableOpacity onPress={toggleFullscreen} style={styles.controlButton}>
+                                    <Icon name={isFullscreen ? "fullscreen-exit" : "fullscreen"} size={24} color="#FFF" />
+                                </TouchableOpacity>
+                            </View>
                         </View>
-                    </View>
-                )}
+                    )}
 
-                {showResolutionModal && (
-                    <Modal
-                        visible={showResolutionModal}
-                        transparent={true}
-                        animationType="fade"
-                        onRequestClose={() => {
-                            setShowResolutionModal(false);
-                            setShowQualityButton(true);
-                            resetQualityButtonTimer();
-                        } }
-                    >
-                        <TouchableOpacity
-                            style={styles.modalOverlay}
-                            activeOpacity={1}
-                            onPress={() => {
+                    {showResolutionModal && (
+                        <Modal
+                            visible={showResolutionModal}
+                            transparent={true}
+                            animationType="fade"
+                            onRequestClose={() => {
                                 setShowResolutionModal(false);
                                 setShowQualityButton(true);
                                 resetQualityButtonTimer();
-                            } }
+                            }}
                         >
-                            <View style={styles.resolutionMenu}>
-                                <Text style={styles.menuTitle}>Quality</Text>
+                            <TouchableOpacity
+                                style={styles.modalOverlay}
+                                activeOpacity={1}
+                                onPress={() => {
+                                    setShowResolutionModal(false);
+                                    setShowQualityButton(true);
+                                    resetQualityButtonTimer();
+                                }}
+                            >
+                                <View style={styles.resolutionMenu}>
+                                    <Text style={styles.menuTitle}>Quality</Text>
 
-                                <TouchableOpacity
-                                    style={[
-                                        styles.resolutionMenuItem,
-                                        !selectedResolution && styles.selectedMenuItem
-                                    ]}
-                                    onPress={() => handleResolutionSelect(0)}
-                                >
-                                    <View style={styles.menuItemLeft}>
-                                        {!selectedResolution && <Icon name="check" size={20} color="#FFF" />}
-                                        <Text style={styles.resolutionText}>Auto</Text>
-                                    </View>
-                                </TouchableOpacity>
-
-                                {availableResolutions.map((resolution) => (
                                     <TouchableOpacity
-                                        key={resolution}
                                         style={[
                                             styles.resolutionMenuItem,
-                                            selectedResolution === resolution && styles.selectedMenuItem
+                                            !selectedResolution && styles.selectedMenuItem
                                         ]}
-                                        onPress={() => handleResolutionSelect(resolution)}
+                                        onPress={() => handleResolutionSelect(0)}
                                     >
                                         <View style={styles.menuItemLeft}>
-                                            {selectedResolution === resolution && <Icon name="check" size={20} color="#FFF" />}
-                                            <Text style={styles.resolutionText}>{resolution}p</Text>
-                                        </View>
-                                        <View style={styles.qualityBadge}>
-                                            <Text style={styles.qualityBadgeText}>
-                                                {getQualityBadge(resolution)}
-                                            </Text>
+                                            {!selectedResolution && <Icon name="check" size={20} color="#FFF" />}
+                                            <Text style={styles.resolutionText}>Auto</Text>
                                         </View>
                                     </TouchableOpacity>
-                                ))}
-                            </View>
-                        </TouchableOpacity>
-                    </Modal>
-                )}
 
-                {(loading || buffering) && (
-                    <View style={styles.overlay}>
-                        <ActivityIndicator size="large" color="#FFF" />
-                        <Text style={styles.overlayText}>{loading ? "Memuat Video..." : "Buffering..."}</Text>
-                    </View>
-                )}
+                                    {availableResolutions.map((resolution) => (
+                                        <TouchableOpacity
+                                            key={resolution}
+                                            style={[
+                                                styles.resolutionMenuItem,
+                                                selectedResolution === resolution && styles.selectedMenuItem
+                                            ]}
+                                            onPress={() => handleResolutionSelect(resolution)}
+                                        >
+                                            <View style={styles.menuItemLeft}>
+                                                {selectedResolution === resolution && <Icon name="check" size={20} color="#FFF" />}
+                                                <Text style={styles.resolutionText}>{resolution}p</Text>
+                                            </View>
+                                            <View style={styles.qualityBadge}>
+                                                <Text style={styles.qualityBadgeText}>
+                                                    {getQualityBadge(resolution)}
+                                                </Text>
+                                            </View>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            </TouchableOpacity>
+                        </Modal>
+                    )}
 
-                {error && (
-                    <View style={styles.overlay}>
-                        <Text style={styles.errorText}>Gagal Memuat Video</Text>
-                        <TouchableOpacity
-                            style={styles.reloadButton}
-                            onPress={handleRefresh}
-                        >
-                            <Icon name="refresh" size={24} color="#FFF" />
-                            <Text style={styles.reloadText}>Muat Ulang</Text>
-                        </TouchableOpacity>
-                    </View>
-                )}
-            </View>
-        </ScrollView></>
+                    {(loading || buffering) && (
+                        <View style={styles.overlay}>
+                            <ActivityIndicator size="large" color="#FFF" />
+                            <Text style={styles.overlayText}>{loading ? "Memuat Video..." : "Buffering..."}</Text>
+                        </View>
+                    )}
+
+                    {error && (
+                        <View style={styles.overlay}>
+                            <Text style={styles.errorText}>Gagal Memuat Video</Text>
+                            <TouchableOpacity
+                                style={styles.reloadButton}
+                                onPress={handleRefresh}
+                            >
+                                <Icon name="refresh" size={24} color="#FFF" />
+                                <Text style={styles.reloadText}>Muat Ulang</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
+                </View>
+            </ScrollView>
+        </>
     );
 };
 
@@ -511,6 +543,7 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
     },
+
     resolutionMenuItem: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -580,7 +613,7 @@ const styles = StyleSheet.create({
     audioPlayer: {
         width: 0,
         height: 0
-    },
+    }
 });
 
 export default VideoPlayer;

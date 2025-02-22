@@ -12,6 +12,7 @@ import {
 import { useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from 'expo-blur';
+import { usePip } from '../contexts/PipContext';
 
 interface Channel {
   name: string;
@@ -23,6 +24,7 @@ interface Channel {
 interface ChannelListProps {
   channels: Channel[];
   currentChannelUrl: string;
+  onChannelSelect?: (channel: Channel) => void;
 }
 
 const ChannelLogo = React.memo(({ logo, channelName }: { logo: string | null, channelName: string }) => {
@@ -85,40 +87,32 @@ const ChannelItem = React.memo(({
 const ChannelList: React.FC<ChannelListProps> = ({
   channels,
   currentChannelUrl,
+  onChannelSelect
 }) => {
   const { width } = useWindowDimensions();
   const navigation = useNavigation();
   const [recommendedChannels, setRecommendedChannels] = useState<Channel[]>([]);
+  const { isInPipMode, exitPip } = usePip();
 
   useEffect(() => {
-    const currentChannel = channels.find(
-      (channel) => channel.url === currentChannelUrl
-    );
-
-    const currentGroup = currentChannel?.group ? currentChannel.group : "Tidak diketahui";
-
-    let filteredChannels = channels.filter(
-      (channel) =>
-        channel.group &&
-        channel.group.trim().toLowerCase() === currentGroup.trim().toLowerCase() &&
-        channel.url !== currentChannelUrl
-    );
-
-    if (filteredChannels.length === 0) {
-      filteredChannels = channels.filter(
-        (channel) => channel.url !== currentChannelUrl
-      );
-    }
-
+    const filteredChannels = channels.filter(channel => channel.url !== currentChannelUrl);
     setRecommendedChannels(filteredChannels.slice(0, 10));
   }, [currentChannelUrl, channels]);
 
-  const handleChannelChange = useCallback(
-    (channelUrl: string) => {
+  const handleChannelChange = useCallback((channelUrl: string) => {
+    const selectedChannel = channels.find(c => c.url === channelUrl);
+    if (!selectedChannel) return;
+
+    if (isInPipMode) {
+      exitPip();
+    }
+    
+    if (onChannelSelect) {
+      onChannelSelect(selectedChannel);
+    } else {
       navigation.navigate("PlayerScreen", { url: channelUrl });
-    },
-    [navigation]
-  );
+    }
+  }, [channels, isInPipMode, exitPip, onChannelSelect, navigation]);
 
   const cardWidth = width <= 360 ? 120 : width <= 480 ? 140 : 160;
 
@@ -145,9 +139,10 @@ const ChannelList: React.FC<ChannelListProps> = ({
           renderItem={renderItem}
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.contentContainer}
+          exitPip={exitPip}
         />
       ) : (
-        <Text style={styles.noRecommendationText}>Tidak ada rekomendasi.</Text>
+        <Text style={styles.noRecommendationText}>No recommendations available</Text>
       )}
     </View>
   );
@@ -183,8 +178,9 @@ const styles = StyleSheet.create({
   },
   cardGradient: {
     height: 180,
-    padding: 4,
+    padding: 2, 
     borderRadius: 16,
+    backgroundColor: 'linear-gradient(180deg, #ffffff 0%, #f0f0f0 100%)', 
   },
   blurContainer: {
     flex: 1,
@@ -192,19 +188,25 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 4,
+    padding: 8, 
+    backgroundColor: 'rgba(214, 228, 24, 0.46)', 
   },
   imageContainer: {
     position: 'relative',
     padding: 4,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255, 251, 8, 0.57)',
     borderRadius: 50,
-    marginBottom: 12,
+    marginBottom: 10, 
+    shadowColor: '#000', 
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
   },
   channelLogo: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    width: 80, 
+    height: 80, 
+    borderRadius: 40,
     backgroundColor: '#2a2a2a',
     resizeMode: 'contain',
   },
@@ -215,7 +217,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     borderRadius: 50,
-    backgroundColor: 'rgba(82, 109, 255, 0.15)',
+    backgroundColor: 'rgba(82, 109, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -240,7 +242,7 @@ const styles = StyleSheet.create({
     textShadowRadius: 2,
   },
   groupName: {
-    color: 'rgba(255,255,255,0.6)',
+    color: 'rgba(2, 2, 19, 0.6)',
     fontSize: 12,
     textAlign: 'center',
   },

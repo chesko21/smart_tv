@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
     View,
     Text,
@@ -20,7 +20,9 @@ import { watchHistoryEvent } from "./PlayerScreen";
 import { useNavigation } from "@react-navigation/native";
 import { launchImageLibrary } from 'react-native-image-picker';
 import { userUpdateEmitter } from './DrawerNavigator';
-
+import { usePip } from '../../contexts/PipContext';
+import LottieView from 'lottie-react-native';
+import loadingAnimation from '../../assets/animations/loading.json';
 
 const isValidURL = (url) => {
     try {
@@ -34,6 +36,7 @@ const isValidURL = (url) => {
 const Header = ({ navigation, user, avatarError, onEditPress, setAvatarError }) => {
     const isValidAvatar = user && user.avatar && typeof user.avatar === 'string';
     const isLocalImage = user?.avatar && !isValidURL(user.avatar);
+    const { setPipMode } = usePip();
 
     const defaultAvatarUrl = "https://img.lovepik.com/png/20231108/cute-cartoon-water-drop-coloring-page-can-be-used-for_531960_wh860.png";
     let imageSource;
@@ -98,9 +101,11 @@ const HistoryTitle = () => {
 
 const Profile = () => {
     const navigation = useNavigation();
+    const { setPipMode } = usePip();
     const [avatarError, setAvatarError] = useState(false);
     const [watchHistory, setWatchHistory] = useState([]);
     const [refreshing, setRefreshing] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
 
     const [user, setUser] = useState({
         name: "",
@@ -125,14 +130,10 @@ const Profile = () => {
             setUser(userData);
             setEditedUser(userData);
             setEditModalVisible(false);
+            userUpdateEmitter.emit('userUpdate'); // Emit event here
         } catch (e) {
             console.error("Failed to save user data to storage", e);
         }
-    };
-
-    const updateUser = async (newUserData) => {
-        await AsyncStorage.setItem('user', JSON.stringify(newUserData));
-        userUpdateEmitter.emit('userUpdate');
     };
 
     const handleEditProfile = () => {
@@ -245,13 +246,11 @@ const Profile = () => {
             console.warn("URL video tidak ditemukan untuk item riwayat:", item);
             return;
         }
+        setPipMode(false); // Set PiP mode to normal
         navigation.navigate("PlayerScreen", {
-            screen: "PlayerScreen",
-            params: {
-                url: item.url,
-                name: item.name,
-                logo: item.logo,
-            },
+            url: item.url,
+            name: item.name,
+            logo: item.logo,
         });
     };
 
@@ -265,7 +264,7 @@ const Profile = () => {
                     source={
                         item.logo
                             ? { uri: item.logo }
-                            : { uri: "https://img.lovepik.com/png/20231108/cute-cartoon-water-drop-coloring-page-can-be-used-for_531960_wh860.png"}
+                            : { uri: "https://img.lovepik.com/png/20231108/cute-cartoon-water-drop-coloring-page-can-be-used-for_531960_wh860.png" }
                     }
                     style={styles.thumbnail}
                 />
@@ -287,6 +286,26 @@ const Profile = () => {
             setAvatarError={setAvatarError}
         />
     );
+
+    useEffect(() => {
+        // Simulate a loading process
+        setTimeout(() => {
+            setIsLoading(false);
+        }, 3000);
+    }, []);
+
+    if (isLoading) {
+        return (
+            <View style={styles.loadingContainer}>
+                <LottieView
+                    source={loadingAnimation}
+                    autoPlay
+                    loop
+                    style={styles.loadingAnimation}
+                />
+            </View>
+        );
+    }
 
     return (
         <SafeAreaView style={styles.container}>
@@ -370,6 +389,16 @@ const Profile = () => {
 };
 
 const styles = StyleSheet.create({
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#000',
+    },
+    loadingAnimation: {
+        width: 200,
+        height: 200,
+    },
     container: {
         flex: 1,
         backgroundColor: "#000",
@@ -468,7 +497,7 @@ const styles = StyleSheet.create({
     },
     flatlistContentContainer: {
         paddingTop: 10,
-        paddingBottom: 20,
+        paddingBottom: 10,
     },
     separator: {
         height: 5,
@@ -545,7 +574,7 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
         marginBottom: 15,
-        overflow: 'hidden', // Important for the image to respect the borderRadius
+        overflow: 'hidden', 
     },
     chooseImagePreview: {
         width: '100%',
