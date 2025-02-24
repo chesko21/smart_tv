@@ -96,7 +96,7 @@ export default function Layout() {
         );
     }
 
-    const bannerTopPosition = Platform.OS === 'ios' ? 
+    const bannerTopPosition = Platform.OS === 'android' ? 
         dimensions.window.height * 0.05 : // 5% from top on iOS
         0; // 0 for Android
 
