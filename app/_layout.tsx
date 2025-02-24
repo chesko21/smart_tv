@@ -96,9 +96,9 @@ export default function Layout() {
         );
     }
 
-    const bannerTopPosition = Platform.OS === 'android' ? 
-        dimensions.window.height * 0.05 :
-        0;
+    const bannerTopPosition = Platform.OS === 'ios' ? 
+        dimensions.window.height * 0.05 : // 5% from top on iOS
+        0; // 0 for Android
 
     return (
         <PipProvider>
