@@ -1,5 +1,4 @@
 {
-  "owner": "chesko25",
   "cli": {
     "version": ">= 15.0.2",
     "appVersionSource": "remote"
