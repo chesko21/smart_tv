@@ -30,7 +30,7 @@ const PlayerScreen = ({ route }) => {
   const { width } = useWindowDimensions();
   const selectedChannel = channels.find((channel) => channel.url === url);
   const channelName = selectedChannel?.name || "Unknown Channel";
-  
+
   const [isPlaying, setIsPlaying] = useState(!!url);
   const [videoDimensions, setVideoDimensions] = useState({
     width: width,
@@ -55,9 +55,9 @@ const PlayerScreen = ({ route }) => {
     const handleBackPress = () => {
       if (isInPipMode) {
         handlePipModeChange(false);
-        return true; 
+        return true;
       }
-      return false; 
+      return false;
     };
     BackHandler.addEventListener("hardwareBackPress", handleBackPress);
     return () => {
@@ -93,6 +93,7 @@ const PlayerScreen = ({ route }) => {
 
   const handleLoad = () => {
     setIsPlaying(true);
+    saveWatchHistory(url, channelName); // Save watching history here
   };
 
   const handleBuffer = ({ isBuffering }) => {
@@ -134,6 +135,28 @@ const PlayerScreen = ({ route }) => {
     setIsPlaying(!isInPipMode);
   }, [url, selectedChannel, setPipMode]);
 
+  const saveWatchHistory = async (videoUrl, channelName) => {
+    try {
+      const existingHistory = await AsyncStorage.getItem('watchHistory');
+      const history = existingHistory ? JSON.parse(existingHistory) : [];
+      const newEntry = {
+        url: videoUrl,
+        name: channelName,
+        timestamp: Date.now(),
+        logo: selectedChannel?.tvgLogo || selectedChannel?.logo || "https://img.lovepik.com/png/20231108/cute-cartoon-water-drop-coloring-page-can-be-used-for_531960_wh860.png"
+      };
+      // Put new entry at the beginning and keep only unique entries
+      const updatedHistory = [newEntry, ...history].filter((item, index, self) =>
+        index === self.findIndex(t => t.url === item.url)
+      );
+      // Keep only the latest 20 items
+      const limitedHistory = updatedHistory.slice(0, 20);
+      await AsyncStorage.setItem('watchHistory', JSON.stringify(limitedHistory));
+      watchHistoryEvent.emit("historyUpdated");
+    } catch (error) {
+      console.error("Failed to save watch history:", error);
+    }
+  };
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar hidden={true} />
@@ -167,9 +190,9 @@ const PlayerScreen = ({ route }) => {
             </View>
           )}
           <View style={styles.infoContainer}>
-            <EPGInfo 
-              tvgId={selectedChannel?.tvgId || null} 
-              channelName={channelName} 
+            <EPGInfo
+              tvgId={selectedChannel?.tvgId || null}
+              channelName={channelName}
             />
           </View>
           <View style={upcomingProgrammes && upcomingProgrammes.length > 0 ? styles.channelListWithUpcoming : styles.channelListWithoutUpcoming}>

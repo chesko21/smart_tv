@@ -12,7 +12,6 @@ import {
     Modal,
     TextInput,
     Alert,
-    Button,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
@@ -36,8 +35,6 @@ const isValidURL = (url) => {
 const Header = ({ navigation, user, avatarError, onEditPress, setAvatarError }) => {
     const isValidAvatar = user && user.avatar && typeof user.avatar === 'string';
     const isLocalImage = user?.avatar && !isValidURL(user.avatar);
-    const { setPipMode } = usePip();
-
     const defaultAvatarUrl = "https://img.lovepik.com/png/20231108/cute-cartoon-water-drop-coloring-page-can-be-used-for_531960_wh860.png";
     let imageSource;
 
@@ -102,6 +99,7 @@ const HistoryTitle = () => {
 const ProfileScreen = () => {
     const navigation = useNavigation();
     const { setPipMode } = usePip();
+
     const [avatarError, setAvatarError] = useState(false);
     const [watchHistory, setWatchHistory] = useState([]);
     const [refreshing, setRefreshing] = useState(false);
@@ -179,7 +177,6 @@ const ProfileScreen = () => {
                     (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
                 );
                 const limitedHistory = uniqueHistory.slice(0, 20);
-
                 setWatchHistory(limitedHistory);
                 await AsyncStorage.setItem("watchHistory", JSON.stringify(limitedHistory));
             } else {
@@ -247,26 +244,28 @@ const ProfileScreen = () => {
             return;
         }
         setPipMode(false); // Set PiP mode to normal
-        navigation.navigate("PlayerScreen", {
+        navigation.navigate('PlayerScreen' as never, {
             url: item.url,
             name: item.name,
             logo: item.logo,
-        });
+        } as never);
     };
 
-    const renderHistoryItem = ({ item, index }) => {
+    const renderHistoryItem = ({ item }) => {
+        const defaultLogo = "https://img.lovepik.com/png/20231108/cute-cartoon-water-drop-coloring-page-can-be-used-for_531960_wh860.png";
+
         return (
             <TouchableOpacity
                 style={styles.historyItem}
                 onPress={() => handleHistoryItemPress(item)}
             >
                 <Image
-                    source={
-                        item.logo
-                            ? { uri: item.logo }
-                            : { uri: "https://img.lovepik.com/png/20231108/cute-cartoon-water-drop-coloring-page-can-be-used-for_531960_wh860.png" }
-                    }
+                    source={{ uri: item.logo || defaultLogo }}
                     style={styles.thumbnail}
+                    defaultSource={{ uri: defaultLogo }}
+                    onError={(e) => {
+                        console.log("Error loading image:", item.logo);
+                    }}
                 />
                 <View style={styles.overlay}>
                     <Text style={styles.historyText} numberOfLines={1}>
@@ -316,6 +315,7 @@ const ProfileScreen = () => {
                 keyExtractor={(item, index) => index.toString()}
                 numColumns={4}
                 renderItem={renderHistoryItem}
+                onLayout={() => console.log("Current watch history:", watchHistory)}
                 ItemSeparatorComponent={() => <View style={styles.separator} />}
                 refreshControl={
                     <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -366,7 +366,6 @@ const ProfileScreen = () => {
                             />
                         </TouchableOpacity>
 
-
                         <View style={styles.modalButtonContainer}>
                             <TouchableOpacity
                                 style={{ ...styles.modalButton, backgroundColor: "#aaa" }}
@@ -406,14 +405,6 @@ const styles = StyleSheet.create({
     fixedHeader: {
         backgroundColor: "#000",
         paddingBottom: 10,
-    },
-    header: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        padding: 15,
-        backgroundColor: "#000",
-        marginTop: 20,
     },
     profileSection: {
         alignItems: "center",
@@ -478,7 +469,8 @@ const styles = StyleSheet.create({
     thumbnail: {
         width: "100%",
         height: "100%",
-        resizeMode: "cover",
+        resizeMode: "contain",
+        backgroundColor: "#222",
     },
     overlay: {
         position: "absolute",
@@ -574,7 +566,7 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
         marginBottom: 15,
-        overflow: 'hidden', 
+        overflow: 'hidden',
     },
     chooseImagePreview: {
         width: '100%',
