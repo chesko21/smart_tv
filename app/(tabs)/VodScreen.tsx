@@ -56,15 +56,15 @@ const Vod = () => {
   const [errorStates, setErrorStates] = useState<ErrorState>({});
 
   const groupKeywords = [
-    "movies", "movie", "film", "films", "bioskop", "cinema",
-    "sinema", "vod", "video on demand", "box office",
-    "action", "adventure", "comedy", "drama", "horror", "thriller",
-    "romance", "documentary", "animation", "anime", "fantasy",
-    "sci-fi", "mystery", "crime", "family", "musical",
-    "series", "tv series", "drama series", "web series",
-    "season", "episode", "show", "tv show", "reality show",
-    "netflix", "disney", "prime", "hbo", "hulu", "apple tv", "komedi", "lk21", "ftv", 
-    "hiburan"
+   "movies", "movie", "film", "films", "bioskop", "cinema",
+      "sinema", "vod", "video on demand", "box office",
+      "action", "adventure", "comedy", "drama", "horror", "thriller",
+      "romance", "documentary", "animation", "anime", "fantasy",
+      "sci-fi", "mystery", "crime", "family", "musical",
+      "series", "tv series", "drama series", "web series",
+      "season", "episode", "show", "tv show", "reality show",
+      "netflix", "disney", "prime", "hbo", "hulu", "apple tv", "komedi", "lk21", "ftv", 
+      "hiburan", "hiburan", "entertainment", "entertainment", "tv show", "tv series", "tv series",
   ].map(keyword => keyword.toLowerCase());
 
   useEffect(() => {
@@ -222,6 +222,20 @@ const Vod = () => {
     );
   }
 
+  if (error) {
+    return (
+      <SafeAreaView style={styles.errorContainer}>
+        <Text style={styles.errorText}>Error: {error.message}</Text>
+        <TouchableOpacity 
+          style={styles.reloadButton}
+          onPress={refetch}
+        >
+          <Text style={styles.reloadButtonText}>Reload</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background }}>
       <Text style={styles.title}>Video On Demand</Text>
@@ -352,6 +366,31 @@ const styles = StyleSheet.create({
   slideshowContainer: {
     flex: 1,
   },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: Colors.background,
+  },
+  errorText: {
+    color: 'red',
+    fontSize: 16,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  reloadButton: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginTop: 10,
+  },
+  reloadButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+
 });
 
 export default Vod;

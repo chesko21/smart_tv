@@ -34,231 +34,318 @@ const EPGInfo: React.FC<EPGInfoProps> = ({ tvgId, channelName }) => {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const { defaultEpgUrls } = useEPG(); 
-
-  // Fetch and process EPG data
   const fetchAndProcessEPG = useCallback(async () => {
-    let channelsData: { [key: string]: { tvgId: string, programme: Program[] } } = {};
-    
-    for (const url of defaultEpgUrls) {
-      console.log(`📡 Fetching EPG from: ${url}`);
-      try {
-        const response = await axios.get(url, { timeout: 5000 }); 
-        const xmlData = response.data;
-
-        const parser = new XMLParser({
-          ignoreAttributes: false,
-          attributeNamePrefix: "",
-          parseTagValue: true,
-          trimValues: true,
-        });
-
-        const parsed = parser.parse(xmlData);
-        let programmes: Program[] = [];
-
-        if (parsed?.tv?.programme) {
-          programmes = Array.isArray(parsed.tv.programme) ? parsed.tv.programme : [parsed.tv.programme];
-        } else if (parsed?.epg?.channel) {
-          const channels = Array.isArray(parsed.epg.channel) ? parsed.epg.channel : [parsed.epg.channel];
-          channels.forEach((channel: { programme: any; id: any; }) => {
-            if (channel.programme) {
-              const channelProgrammes = Array.isArray(channel.programme) ? channel.programme : [channel.programme];
-              programmes.push(...channelProgrammes.map(prog => ({
-                ...prog,
-                channel: channel.id || "",
-              })));
+        try {
+            // Clear all old EPG data chunks
+            const oldChunkCount = parseInt(await AsyncStorage.getItem('epgChunkCount') || '0');
+            for (let i = 0; i < oldChunkCount * 100; i += 100) {
+                await AsyncStorage.removeItem(`epgData_${i}`);
             }
-          });
-        } else {
-          console.warn(`⚠️ Invalid XML format from ${url}. Check the structure.`);
-          continue;
+            await AsyncStorage.removeItem('epgChunkCount');
+            await AsyncStorage.removeItem('lastUpdated');
+            
+            const storedUrls = await AsyncStorage.getItem('epgUrls');
+            const epgUrls = storedUrls ? JSON.parse(storedUrls) : [];
+            // Remove duplicate URLs
+            const uniqueUrls = [...new Set([...defaultEpgUrls, ...epgUrls.filter((u: { active: any; }) => u.active).map((u: { url: any; }) => u.url)])];
+            
+            console.log('Processing EPG URLs:', uniqueUrls);
+
+            // Initialize channelsData object
+            let channelsData: { [key: string]: { tvgId: string, programme: Program[] } } = {};
+
+            for (const url of uniqueUrls) {
+                console.log(`📡 Fetching EPG from: ${url}`);
+                try {
+                    const response = await axios.get(url, { 
+                        timeout: 60000,
+                        maxContentLength: Infinity
+                    });
+                    
+                    const xmlData = response.data;
+                    
+                    const parser = new XMLParser({
+                        ignoreAttributes: false,
+                        attributeNamePrefix: "",
+                        parseTagValue: true,
+                        trimValues: true,
+                    });
+                    const parsed = parser.parse(xmlData);
+                    console.log(`✅ Parsed XML from ${url}`);
+
+                    // Process programmes with proper merging
+                    let programmes: Program[] = [];
+                    if (parsed?.tv?.programme) {
+                        programmes = Array.isArray(parsed.tv.programme) 
+                          ? parsed.tv.programme 
+                          : [parsed.tv.programme];
+                    } else if (parsed?.epg?.channel) {
+                        const channels = Array.isArray(parsed.epg.channel) 
+                          ? parsed.epg.channel 
+                          : [parsed.epg.channel];
+                        
+                        channels.forEach((channel: { programme: any; id: any; }) => {
+                          if (channel.programme) {
+                              const channelProgrammes = Array.isArray(channel.programme) 
+                                ? channel.programme 
+                                : [channel.programme];
+                              programmes.push(...channelProgrammes.map(prog => ({
+                                ...prog,
+                                channel: channel.id || "",
+                              })));
+                          }
+                        });
+                    }
+
+                    // Merge programmes with validation
+                    programmes.forEach(prog => {
+                        if (!prog.start || !prog.stop) return;
+                        
+                        const channel = prog.channel || "unknown";
+                        if (!channelsData[channel]) {
+                            channelsData[channel] = { tvgId: channel, programme: [] };
+                        }
+
+                        // Add programme if it doesn't exist
+                        const exists = channelsData[channel].programme.some(
+                            existing => existing.start === prog.start && 
+                                      existing.stop === prog.stop &&
+                                      existing.title === prog.title
+                        );
+
+                        if (!exists) {
+                            channelsData[channel].programme.push({
+                                start: prog.start,
+                                stop: prog.stop,
+                                title: typeof prog.title === "string" ? prog.title : prog.title?.["#text"] || "No Title",
+                                channel: channel
+                            });
+                        }
+                    });
+
+                    console.log(`✅ Processed ${programmes.length} programmes from ${url}`);
+                } catch (error) {
+                    console.error(`❌ Failed to process ${url}:`, error);
+                }
+            }
+
+            // Sort all programmes by start time
+            Object.keys(channelsData).forEach(channel => {
+                channelsData[channel].programme.sort((a, b) => 
+                    parseInt(a.start) - parseInt(b.start)
+                );
+            });
+
+            // Save data in chunks with unique indices
+            const chunkSize = 500;
+            const entries = Object.entries(channelsData);
+            const totalChunks = Math.ceil(entries.length / chunkSize);
+
+            for (let i = 0; i < entries.length; i += chunkSize) {
+                const chunk = Object.fromEntries(
+                    entries.slice(i, i + chunkSize)
+                );
+                const chunkIndex = Math.floor(i / chunkSize);
+                await AsyncStorage.setItem(`epgData_${chunkIndex}`, JSON.stringify(chunk));
+            }
+
+            await AsyncStorage.setItem('epgChunkCount', totalChunks.toString());
+            await AsyncStorage.setItem('lastUpdated', Date.now().toString());
+            
+            console.log(`✅ Processed and saved EPG data in ${totalChunks} chunks`);
+        } catch (error) {
+            console.error('❌ EPG processing failed:', error);
+            throw error;
         }
+    }, [defaultEpgUrls]);
+    useEffect(() => {
+        const loadEPGData = async () => {
+            setError(null);
+            setLoading(true);
+    
+            try {
+                const lastUpdated = await AsyncStorage.getItem('lastUpdated');
+                const now = Date.now();
+    
+                if (!lastUpdated || (now - parseInt(lastUpdated) > 86400000)) {
+                    await fetchAndProcessEPG();
+                }
 
-        programmes.forEach(prog => {
-          const { start, stop, title } = prog;
-          const channel = prog.channel || "unknown";
-          if (!channelsData[channel]) {
-            channelsData[channel] = { tvgId: channel, programme: [] };
-          }
-          channelsData[channel].programme.push({
-            start: start || "00000000000000",
-            stop: stop || "00000000000000",
-            title: typeof title === "string" ? title : title?.["#text"] || "No Title",
-            channel: ""
-          });
-        });
-
-        console.log(`✅ Successfully processed: ${url}`);
-      } catch (error) {
-        console.error(`❌ Failed to fetch ${url}:`, (error as Error).message);
-        setError("Gagal memuat data EPG. Silakan coba lagi nanti."); 
-      }
-    }
-
-    const result = Object.values(channelsData);
-    await AsyncStorage.setItem('epgData', JSON.stringify(result));
-    await AsyncStorage.setItem('lastUpdated', Date.now().toString());
-    console.log("✅ All EPG data processed and saved to AsyncStorage!");
-  }, [defaultEpgUrls]);
-
-  useEffect(() => {
-    const loadEPGData = async () => {
-      setError(null);
-      setLoading(true);
-
-      try {
-        const storedData = await AsyncStorage.getItem('epgData');
-        const lastUpdated = await AsyncStorage.getItem('lastUpdated');
-        const now = Date.now();
-  
-        if (!storedData || !lastUpdated || (now - parseInt(lastUpdated) > 86400000)) {
-          await fetchAndProcessEPG();
-        } else {
-          const epgData = JSON.parse(storedData);
-          const epgChannel = epgData.find((epg: { tvgId: string }) => normalizeTvgId(epg.tvgId) === normalizeTvgId(tvgId)) || null;
-
-          if (epgChannel) {
-            const nowLocal = DateTime.local().setZone("UTC");
-            const nowString = nowLocal.toFormat("yyyyMMddHHmmss");
-  
-            const currentProgram = epgChannel.programme.find((prog: Program) => {
-              const startsAt = parseInt(prog.start);
-              const stopsAt = parseInt(prog.stop);
-              const now = parseInt(nowString);
-              return startsAt <= now && (!stopsAt || stopsAt > now);
-            }) || { title: "Tidak ada informasi program", start: "", stop: "" };
-  
-            const nextProgram = epgChannel.programme.find((prog: Program) => parseInt(prog.start) > parseInt(nowString)) || { title: "Tidak ada informasi program", start: "", stop: "" };
-            const upcoming = epgChannel.programme.filter((prog: Program) => parseInt(prog.start) > parseInt(nowString)).slice(0, 5);
-
-            setProgrammes([currentProgram, nextProgram]);
-            setUpcomingProgrammes(upcoming.length > 0 ? upcoming : [{
-              title: "Tidak ada informasi program", start: "", stop: ""
-            }]);
-          } else {
-            setProgrammes([{
-              title: "Tidak ada informasi program", start: "", stop: "",
-              channel: ""
-            }, {
-              title: "Tidak ada informasi program", start: "", stop: "",
-              channel: ""
-            }]);
-            setUpcomingProgrammes([{
-              title: "Tidak ada informasi program", start: "", stop: "",
-              channel: ""
-            }]);
-          }
+                // Load chunked data
+                const chunkCount = parseInt(await AsyncStorage.getItem('epgChunkCount') || '0');
+                let epgData = [];
+                
+                for (let i = 0; i < chunkCount * 100; i += 100) {
+                    const chunk = await AsyncStorage.getItem(`epgData_${i}`);
+                    if (chunk) {
+                        const parsedChunk = Object.values(JSON.parse(chunk));
+                        epgData.push(...parsedChunk);
+                    }
+                }
+                const epgChannel = epgData.find((epg: { tvgId: string }) => 
+                    normalizeTvgId(epg.tvgId) === normalizeTvgId(tvgId)
+                ) || null;
+                // Update the loadEPGData function to handle data loading better
+                if (epgChannel) {
+                    const nowLocal = DateTime.local().setZone("UTC");
+                    const nowString = nowLocal.toFormat("yyyyMMddHHmmss");
+    
+                    // Filter out expired programs
+                    const validPrograms = epgChannel.programme.filter((prog: Program) => 
+                        parseInt(prog.stop) >= parseInt(nowString)
+                    );
+    
+                    const currentProgram = validPrograms.find((prog: Program) => {
+                        const startsAt = parseInt(prog.start);
+                        const stopsAt = parseInt(prog.stop);
+                        const now = parseInt(nowString);
+                        return startsAt <= now && stopsAt > now;
+                    });
+    
+                    const nextProgram = epgChannel.programme.find((prog: Program) => parseInt(prog.start) > parseInt(nowString)) || { title: "Tidak ada informasi program", start: "", stop: "" };
+                    const upcoming = epgChannel.programme.filter((prog: Program) => parseInt(prog.start) > parseInt(nowString)).slice(0, 5);
+    
+                    setProgrammes([currentProgram, nextProgram]);
+                    setUpcomingProgrammes(upcoming.length > 0 ? upcoming : [{
+                      title: "Tidak ada informasi program", start: "", stop: ""
+                    }]);
+                } else {
+                    setProgrammes([{
+                      title: "Tidak ada informasi program", start: "", stop: "",
+                      channel: ""
+                    }, {
+                      title: "Tidak ada informasi program", start: "", stop: "",
+                      channel: ""
+                    }]);
+                    setUpcomingProgrammes([{
+                      title: "Tidak ada informasi program", start: "", stop: "",
+                      channel: ""
+                    }]);
+                }
+            } catch (err) {
+                console.error(err);
+                setError("Failed to load EPG data.");
+            } finally {
+                setLoading(false);
+                setLastUpdated(new Date());
+            }
+        };
+    
+        loadEPGData();
+    
+        const interval = setInterval(() => {
+            fetchAndProcessEPG();
+        }, 86400000);
+    
+        return () => clearInterval(interval); 
+    }, [fetchAndProcessEPG, tvgId]); 
+    
+    // Format time function
+    const formatTime = (timeString: string | undefined | null) => {
+        if (!timeString) {
+            return DateTime.local().toFormat("HH:mm");
         }
-      } catch (err) {
-        console.error(err);
-        setError("Failed to load EPG data.");
-      } finally {
-        setLoading(false);
-        setLastUpdated(new Date());
-      }
+    
+        const datePart = timeString.substring(0, 14);
+        return DateTime.fromFormat(datePart, "yyyyMMddHHmmss", { zone: "UTC" })
+          .setZone("Asia/Jakarta").toFormat("HH:mm");
     };
-
-    loadEPGData();
-
-    const interval = setInterval(() => {
-      fetchAndProcessEPG();
-    }, 86400000);
-
-    return () => clearInterval(interval); 
-  }, [fetchAndProcessEPG, tvgId]); 
-  
-  // Format time function
-  const formatTime = (timeString: string | undefined | null) => {
-    if (!timeString) {
-      return DateTime.local().toFormat("HH:mm");
+    
+    // Scroll animation for upcoming programs
+    useEffect(() => {
+        Animated.loop(
+            Animated.timing(scrollAnim, {
+                toValue: -width,
+                duration: 10000,
+                useNativeDriver: true,
+            }),
+            { iterations: -1 }
+        ).start();
+    }, [scrollAnim, width]);
+    
+    // Function to truncate text
+    const truncateText = (text: string | undefined, maxLength: number) => {
+        if (!text) return "Tidak ada program";
+        return text.length > maxLength ? text.substring(0, maxLength) + "..." : text;
+    };
+    
+    // Loading state
+    if (loading) {
+        return (
+            <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#e3c800" />
+                <Text style={styles.loadingText}>Memuat data EPG...</Text>
+                {lastUpdated && (
+                    <Text style={styles.lastUpdatedText}>
+                        Terakhir diperbarui: {lastUpdated.toLocaleTimeString()}
+                    </Text>
+                )}
+            </View>
+        );
     }
-
-    const datePart = timeString.substring(0, 14);
-    return DateTime.fromFormat(datePart, "yyyyMMddHHmmss", { zone: "UTC" })
-      .setZone("Asia/Jakarta").toFormat("HH:mm");
-  };
-
-  // Scroll animation for upcoming programs
-  useEffect(() => {
-    Animated.loop(
-      Animated.timing(scrollAnim, {
-        toValue: -width,
-        duration: 10000,
-        useNativeDriver: true,
-      }),
-      { iterations: -1 }
-    ).start();
-  }, [scrollAnim, width]);
-
-  // Function to truncate text
-  const truncateText = (text: string | undefined, maxLength: number) => {
-    if (!text) return "Tidak ada program";
-    return text.length > maxLength ? text.substring(0, maxLength) + "..." : text;
-  };
-
-  // Loading state
-  if (loading) {
+    
+    // Error state
+    if (error) {
+        return (
+            <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{error}</Text>
+                <Button 
+                    title="Coba Lagi" 
+                    onPress={() => {
+                        setError(null);
+                        setLoading(true);
+                        fetchAndProcessEPG()
+                          .catch(() => setError("Failed to load EPG data."))
+                          .finally(() => {
+                            setLoading(false);
+                            setLastUpdated(new Date());
+                          });
+                    }} 
+                    color="#e3c800" 
+                />
+            </View>
+        );
+    }
+    
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#e3c800" />
-        <Text style={styles.loadingText}>Memuat data EPG...</Text>
-        {lastUpdated && (
-          <Text style={styles.lastUpdatedText}>
-            Terakhir diperbarui: {lastUpdated.toLocaleTimeString()}
-          </Text>
-        )}
-      </View>
-    );
-  }
-
-  // Error state
-  if (error) {
-    return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>{error}</Text>
-        <Button title="Coba Lagi" onPress={loadEPGData} color="#e3c800" />
-      </View>
-    );
-  }
-
-  return (
-    <View>
-      <LinearGradient colors={["#2b2b2b", "#1e1e1e"]} style={styles.programmeContainer}>
-        {/* Current Program */}
-        <View style={styles.programmeBox}>
-          <View style={styles.programmeLeft}>
-            <Text style={styles.programmeTitle}>Sedang Tayang</Text>
-            <Text style={styles.programmeText}>{truncateText(programmes[0]?.title, 20)}</Text>
-            <Text style={styles.programmeTime}>
-              {formatTime(programmes[0]?.start)} - {formatTime(programmes[0]?.stop)} WIB
-            </Text>
-          </View>
-          
-          {/* Next Program */}
-          <View style={styles.programmeRight}>
-            <Text style={styles.programmeTitle}>Tayangan Berikut</Text>
-            <Text style={styles.programmeText}>{truncateText(programmes[1]?.title, 20)}</Text>
-            <Text style={styles.programmeTime}>
-              {formatTime(programmes[1]?.start)} - {formatTime(programmes[1]?.stop)} WIB
-            </Text>
-          </View>
+        <View>
+            <LinearGradient colors={["#2b2b2b", "#1e1e1e"]} style={styles.programmeContainer}>
+                {/* Current Program */}
+                <View style={styles.programmeBox}>
+                    <View style={styles.programmeLeft}>
+                        <Text style={styles.programmeTitle}>Sedang Tayang</Text>
+                        <Text style={styles.programmeText}>{truncateText(programmes[0]?.title, 20)}</Text>
+                        <Text style={styles.programmeTime}>
+                          {formatTime(programmes[0]?.start)} - {formatTime(programmes[0]?.stop)} WIB
+                        </Text>
+                    </View>
+                    
+                    {/* Next Program */}
+                    <View style={styles.programmeRight}>
+                        <Text style={styles.programmeTitle}>Tayangan Berikut</Text>
+                        <Text style={styles.programmeText}>{truncateText(programmes[1]?.title, 20)}</Text>
+                        <Text style={styles.programmeTime}>
+                          {formatTime(programmes[1]?.start)} - {formatTime(programmes[1]?.stop)} WIB
+                        </Text>
+                    </View>
+                </View>
+            </LinearGradient>
+    
+            {/* Upcoming Programs */}
+            {upcomingProgrammes.length > 0 && (
+                <View style={styles.upcomingContainer}>
+                    <Text style={styles.upcomingTitle}>{channelName}</Text>
+                    <Animated.View style={[styles.scrollContainer, { transform: [{ translateX: scrollAnim }] }]}>
+                        {upcomingProgrammes.map((item, index) => (
+                            <Text key={index} style={styles.upcomingText}>
+                                {truncateText(item.title, 20)} - {formatTime(item.start)} - {formatTime(item.stop)} WIB{"    "}
+                            </Text>
+                        ))}
+                    </Animated.View>
+                </View>
+            )}
         </View>
-      </LinearGradient>
-
-      {/* Upcoming Programs */}
-      {upcomingProgrammes.length > 0 && (
-        <View style={styles.upcomingContainer}>
-          <Text style={styles.upcomingTitle}>{channelName}</Text>
-          <Animated.View style={[styles.scrollContainer, { transform: [{ translateX: scrollAnim }] }]}>
-            {upcomingProgrammes.map((item, index) => (
-              <Text key={index} style={styles.upcomingText}>
-                {truncateText(item.title, 20)} - {formatTime(item.start)} - {formatTime(item.stop)} WIB{"    "}
-              </Text>
-            ))}
-          </Animated.View>
-        </View>
-      )}
-    </View>
-  );
+    );
 };
 
 // Styling for the component

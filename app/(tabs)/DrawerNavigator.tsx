@@ -277,21 +277,20 @@ const CustomDrawerContent = React.memo((props) => {
   );
 });
 
-// Styles for the DrawerNavigator
 const styles = StyleSheet.create({
   drawerContainer: {
     flex: 1,
     backgroundColor: Colors.background,
   },
   drawerHeader: {
-    padding: 20,
+    padding: 10,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
     alignItems: 'center',
   },
   drawerAvatar: {
-    width: 80,
-    height: 80,
+    width: 60,
+    height: 60,
     borderRadius: 40,
     marginBottom: 10,
     backgroundColor: '#ccc',

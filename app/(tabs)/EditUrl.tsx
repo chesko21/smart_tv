@@ -21,6 +21,8 @@ import { useNavigation } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import useM3uParse from "../../hooks/M3uParse";
 import { useFocusEffect } from '@react-navigation/native';
+import axios from 'axios';
+import Toast from "react-native-toast-message";
 
 
 const EditUrl = () => {
@@ -48,7 +50,10 @@ const EditUrl = () => {
     const insets = useSafeAreaInsets();
     const [fadeAnim] = useState(new Animated.Value(0));
     const navigation = useNavigation();
-
+    const handleDeleteUrl = useCallback((url: string) => {
+        setSelectedUrl(url);
+        setModalVisible(true);
+    }, []);
     // Request camera permissions
     useEffect(() => {
         const getCameraPermissions = async () => {
@@ -70,17 +75,20 @@ const EditUrl = () => {
                 const active = await loadActiveUrl();
                 console.log(`Loaded Active URL: ${active}`);
 
-                if (active && isValidUrl(active)) {
+                if (active && await isValidUrl(active)) {
                     setActiveUrl(active);
+                    await useM3uSaveActiveUrl(active);
                     refetch();
                 } else {
-                  
-                    const defaultActive = defaultUrls.find(url => url.enabled)?.url;
-
-                    if (defaultActive) {
-                        setActiveUrl(defaultActive);
-                        await useM3uSaveActiveUrl(defaultActive);
+                    // If no valid active URL, set the first default URL as active
+                    const firstDefaultUrl = defaultUrls[0]?.url;
+                    if (firstDefaultUrl) {
+                        setActiveUrl(firstDefaultUrl);
+                        await useM3uSaveActiveUrl(firstDefaultUrl);
+                        console.log(`Setting default URL as active: ${firstDefaultUrl}`);
                         refetch();
+                    } else {
+                        console.log('No default URLs available');
                     }
                 }
             } catch (error) {
@@ -118,10 +126,27 @@ const EditUrl = () => {
         return () => clearInterval(intervalId);
     }, [refetch]);
 
-    // Validate URL format
-    const isValidUrl = (url: string) => {
+    // Validate URL format and verify M3U content
+    const isValidUrl = async (url: string) => {
         const urlPattern = /^(https?:\/\/)[\w\-]+(\.[\w\-]+)+([\w\-\.,@?^=%&:/~+#]*[\w\-\@?^=%&/~+#])?$/;
-        return urlPattern.test(url);
+        if (!urlPattern.test(url)) return false;
+
+        try {
+            const response = await axios.get(url, { 
+                timeout: 60000, // Increased to 60 seconds
+                maxContentLength: Infinity, // No size limit
+                headers: {
+                    'Accept': 'text/plain',
+                    'User-Agent': 'Mozilla/5.0'
+                }
+            });
+            
+            const content = response.data.toString();
+            return content.includes('#EXTM3U');
+        } catch (error) {
+            console.error("URL validation error:", error);
+            return false;
+        }
     };
 
     // Save new URL to AsyncStorage
@@ -150,40 +175,84 @@ const EditUrl = () => {
     // Handle adding URL with validation
     const handleAddUrl = useCallback(async () => {
         const trimmedUrl = newUrl.trim();
-        if (!isValidUrl(trimmedUrl)) {
-            Alert.alert("Invalid URL", "Please enter a valid URL.");
-            return;
-        }
-        if (userUrls.includes(trimmedUrl)) {
-            Alert.alert("Duplicate URL", "This URL already exists in the list.");
-            return;
-        }
         setIsProcessing(true);
-        await addUrl(trimmedUrl);
-        setIsProcessing(false);
+        
+        try {
+            // Clear database before adding new URL
+            await AsyncStorage.removeItem('channelsData');
+            
+            const isValid = await isValidUrl(trimmedUrl);
+            if (!isValid) {
+                Toast.show({
+                    type: 'error',
+                    text1: 'Invalid URL',
+                    text2: 'Please enter a valid M3U playlist URL with fewer channels.'
+                });
+                return;
+            }
+
+            if (userUrls.includes(trimmedUrl)) {
+                Toast.show({
+                    type: 'error',
+                    text1: 'Duplicate URL',
+                    text2: 'This URL already exists in the list.'
+                });
+                return;
+            }
+
+            await addUrl(trimmedUrl);
+            Toast.show({
+                type: 'success',
+                text1: 'Success',
+                text2: 'URL added successfully!'
+            });
+        } catch (error) {
+            console.error("Failed to verify URL:", error);
+            Toast.show({
+                type: 'error',
+                text1: 'Error',
+                text2: 'Failed to verify M3U playlist URL. The playlist might be too large.'
+            });
+        } finally {
+            setIsProcessing(false);
+        }
     }, [newUrl, userUrls, addUrl]);
 
-    const handleDeleteUrl = useCallback((url: React.SetStateAction<null>) => {
-        setSelectedUrl(url);
-        setModalVisible(true);
-    }, []);
-
-    const confirmDelete = useCallback(async () => {
-        setIsProcessing(true);
-        await deleteUrl(selectedUrl);
-        setIsProcessing(false);
-        setModalVisible(false);
-    }, [selectedUrl, deleteUrl]);
-
+    // Update URL toggle to include verification
     const handleToggleUrl = useCallback(async (url: React.SetStateAction<string>) => {
         if (url !== activeUrl) {
             setIsProcessing(true);
-            setActiveUrl(url);
-            refetch();
-            setIsProcessing(false);
-        }
-    }, [activeUrl, refetch]);
+            try {
+                const isValid = await isValidUrl(url);
+                if (!isValid) {
+                    Toast.show({
+                        type: 'error',
+                        text1: 'Invalid URL',
+                        text2: 'The selected URL is not a valid M3U playlist.'
+                    });
+                    return;
+                }
 
+                await useM3uSaveActiveUrl(url);
+                setActiveUrl(url);
+                await refetch();
+                Toast.show({
+                    type: 'success',
+                    text1: 'Success',
+                    text2: 'URL activated successfully!'
+                });
+            } catch (error) {
+                console.error("Failed to toggle URL:", error);
+                Toast.show({
+                    type: 'error',
+                    text1: 'Error',
+                    text2: 'Failed to verify M3U playlist URL.'
+                });
+            } finally {
+                setIsProcessing(false);
+            }
+        }
+    }, [activeUrl, refetch, useM3uSaveActiveUrl]);
     // Handle pull-to-refresh functionality
     const onRefresh = async () => {
         setRefreshing(true);
@@ -192,17 +261,22 @@ const EditUrl = () => {
     };
 
     // Handle barcode scanning result
-    const handleBarcodeScanned = ({ data }) => {
+    const handleBarcodeScanned = async ({ data }) => {
         setScanned(true);
-        if (isValidUrl(data)) {
-            setNewUrl(data);
-            setScannerVisible(false);
-            handleAddUrl();
-        } else {
-            Alert.alert("Invalid URL", "The QR code does not contain a valid URL.");
+        try {
+            const isValid = await isValidUrl(data);
+            if (isValid) {
+                setNewUrl(data);
+                setScannerVisible(false);
+                handleAddUrl();
+            } else {
+                Alert.alert("Invalid URL", "The QR code does not contain a valid M3U playlist URL.");
+            }
+        } catch (error) {
+            console.error("QR code validation error:", error);
+            Alert.alert("Error", "Failed to validate QR code URL");
         }
     };
-
     const combinedUrls = useMemo(() => {
         return [
             ...defaultUrls.map((item: { url: string }, index: number) => ({
@@ -224,8 +298,12 @@ const EditUrl = () => {
         <Animated.View style={[styles.container, { opacity: fadeAnim, paddingTop: insets.top }]}>
             <StatusBar barStyle="dark-content" />
             <View style={styles.header}>
-                <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} accessibilityLabel="Back">
-                    <Icon name="arrow-left" size={16} color="#333" />
+                <TouchableOpacity 
+                    style={styles.backButton} 
+                    onPress={() => navigation.goBack()} 
+                    accessibilityLabel="Back"
+                >
+                    <Icon name="arrow-left" size={16} color="#fff" />
                 </TouchableOpacity>
                 <Text style={styles.title}>Manage M3U URLs</Text>
                 <View style={styles.headerRight} />
@@ -328,13 +406,24 @@ const EditUrl = () => {
             >
                 <View style={styles.modalContainer}>
                     <Icon name="exclamation-circle" size={20} color="#FF5733" />
-                    <Text style={styles.modalTitle}>Delete URL?</Text>
-                    <Text style={styles.modalMessage}>Are you sure you want to delete this URL?</Text>
+                    <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold', marginVertical: 8 }}>Delete URL?</Text>
+                    <Text style={{ color: '#fff', fontSize: 16, marginVertical: 12, textAlign: 'center' }}>Are you sure you want to delete this URL?</Text>
                     <View style={styles.modalButtons}>
-                        <TouchableOpacity style={[styles.modalButton, styles.cancelButton]} onPress={() => setModalVisible(false)}>
+                        <TouchableOpacity 
+                            style={[styles.modalButton, styles.cancelButton]} 
+                            onPress={() => setModalVisible(false)}
+                        >
                             <Text style={styles.buttonText}>Cancel</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={[styles.modalButton, styles.confirmButton]} onPress={confirmDelete}>
+                        <TouchableOpacity 
+                            style={[styles.modalButton, styles.confirmButton]} 
+                            onPress={async () => {
+                                setIsProcessing(true);
+                                await deleteUrl(selectedUrl);
+                                setIsProcessing(false);
+                                setModalVisible(false);
+                            }}
+                        >
                             <Text style={styles.buttonText}>Delete</Text>
                         </TouchableOpacity>
                     </View>
@@ -377,6 +466,7 @@ const EditUrl = () => {
                     )}
                 </View>
             </Modal>
+         <Toast />
         </Animated.View>
     );
 };
@@ -384,181 +474,171 @@ const EditUrl = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: "#000",
-    },
-    title: {
-        fontSize: 20,
-        fontWeight: "600",
-        color: "#FF5733",
-    },
-    inputContainer: {
-        flexDirection: "row",
-        paddingHorizontal: 20,
-        marginBottom: 20,
-        alignItems: "center",
-    },
-    inputWrapper: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        borderRadius: 12,
-        marginRight: 10,
-        paddingHorizontal: 12,
-        backgroundColor: "#Ff3",
-    },
-    inputIcon: {
-        marginRight: 8,
-    },
-    input: {
-        flex: 1,
-        height: 48,
-        color: '#333',
-        fontSize: 16,
-    },
-    actionButton: {
-        width: 48,
-        height: 48,
-        borderRadius: 12,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    addButton: {
-        backgroundColor: "#4CAF50",
-    },
-    scanButton: {
-        backgroundColor: "#007BFF",
-        marginLeft: 8,
-    },
-    listContainer: {
-        paddingHorizontal: 20,
-    },
-    listItem: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        marginBottom: 12,
-        padding: 16,
-        borderRadius: 12,
-        backgroundColor: "#Ff3",
-    },
-    urlInfoContainer: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    urlIcon: {
-        marginRight: 8,
-    },
-    urlText: {
-        flex: 1,
-        fontSize: 15,
-        color: '#000',
-    },
-    activeUrlText: {
-        color: '#4CAF50',
-        fontWeight: '600',
-    },
-    actionContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    deleteButton: {
-        marginLeft: 16,
-        padding: 8,
-    },
-    modalContainer: {
-        backgroundColor: "white",
-        padding: 20,
-        borderRadius: 10,
-        alignItems: "center",
-    },
-    scannerContainer: {
-        height: 400,
-        position: 'relative',
-        borderRadius: 10,
-        overflow: 'hidden',
-        backgroundColor: 'black',
-    },
-    closeButton: {
-        position: "absolute",
-        top: 10,
-        right: 10,
-        backgroundColor: "rgba(255, 87, 51, 0.8)",
-        padding: 12,
-        borderRadius: 30,
-        zIndex: 1,
-    },
-    modalTitle: {
-        fontSize: 18,
-        fontWeight: "bold",
-        marginVertical: 10,
-    },
-    modalMessage: {
-        textAlign: "center",
-        marginBottom: 20,
-        color: "#555",
-    },
-    modalButtons: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        width: "100%",
-    },
-    modalButton: {
-        flex: 1,
-        padding: 10,
-        alignItems: "center",
-        borderRadius: 5,
-    },
-    cancelButton: {
-        backgroundColor: "#757575",
-        marginRight: 5,
-    },
-    confirmButton: {
-        backgroundColor: "#FF5733",
-        marginLeft: 5,
-    },
-    buttonText: {
-        color: "white",
-        fontWeight: "bold",
-    },
-    disabledButton: {
-        backgroundColor: "#ccc",
-    },
-    errorText: {
-        color: "red",
-        fontSize: 14,
-        marginTop: 5,
-        textAlign: "center",
-    },
-    scannerText: {
-        color: 'white',
-        textAlign: 'center',
-        padding: 20,
-    },
-    rescanButton: {
-        position: 'absolute',
-        bottom: 20,
-        alignSelf: 'center',
-        backgroundColor: 'rgba(76, 175, 80, 0.8)',
-        padding: 12,
-        borderRadius: 30,
+        backgroundColor: '#121212',
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 16,
-        paddingVertical: 8,
-        backgroundColor: 'transparent',
+        paddingVertical: 16,
+        backgroundColor: '#1E1E1E',
+        borderBottomWidth: 1,
+        borderBottomColor: '#2A2A2A',
     },
     backButton: {
-        padding: 8,
+        padding: 10,
         borderRadius: 20,
-        backgroundColor: 'rgba(255,255,255,0.9)',
+        backgroundColor: '#FF5733',
     },
     headerRight: {
         width: 40,
     },
+    title: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#fff',
+    },
+    inputContainer: {
+        flexDirection: 'row',
+        padding: 16,
+        backgroundColor: '#1E1E1E',
+        marginTop: 16,
+        marginHorizontal: 16,
+        borderRadius: 12,
+    },
+    inputWrapper: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#2A2A2A',
+        borderRadius: 8,
+        marginRight: 8,
+        paddingHorizontal: 12,
+    },
+    input: {
+        flex: 1,
+        height: 45,
+        color: '#fff',
+        fontSize: 16,
+    },
+    actionButton: {
+        width: 45,
+        height: 45,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: 8,
+    },
+    addButton: {
+        backgroundColor: '#4CAF50',
+    },
+    scanButton: {
+        backgroundColor: '#2A2A2A',
+        marginLeft: 8,
+    },
+    listContainer: {
+        padding: 16,
+    },
+    listItem: {
+        backgroundColor: '#1E1E1E',
+        borderRadius: 12,
+        marginBottom: 12,
+        padding: 16,
+        elevation: 2,
+        borderWidth: 1,
+        borderColor: '#2A2A2A',
+    },
+    urlInfoContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    urlIcon: {
+        marginRight: 8,
+    },
+    urlText: {
+        flex: 1,
+        color: '#fff',
+        fontSize: 14,
+    },
+    activeUrlText: {
+        color: '#4CAF50',
+    },
+    actionContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        borderTopWidth: 1,
+        borderTopColor: '#2A2A2A',
+        paddingTop: 12,
+    },
+    deleteButton: {
+        padding: 8,
+        borderRadius: 20,
+        backgroundColor: '#2A2A2A',
+        marginLeft: 12,
+    },
+    modalContainer: {
+        backgroundColor: '#1E1E1E',
+        padding: 20,
+        borderRadius: 12,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#2A2A',
+    },
+    modalButtons: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        width: '100%',
+        marginTop: 16,
+    },
+    modalButton: {
+        flex: 1,
+        padding: 12,
+        alignItems: 'center',
+        borderRadius: 8,
+        marginHorizontal: 5,
+    },
+    cancelButton: {
+        backgroundColor: '#2A2A2A',
+    },
+    confirmButton: {
+        backgroundColor: '#FF5733',
+    },
+    buttonText: {
+        color: '#fff',
+        fontWeight: '600',
+    },
+    errorText: {
+        color: '#FF5733',
+        fontSize: 14,
+        marginHorizontal: 16,
+        marginTop: 8,
+    },
+    scannerContainer: {
+        height: 400,
+        borderRadius: 12,
+        overflow: 'hidden',
+        backgroundColor: '#1E1E1E',
+        borderWidth: 1,
+        borderColor: '#2A2A2A',
+    },
+    closeButton: {
+        position: 'absolute',
+        top: 16,
+        right: 16,
+        backgroundColor: '#2A2A2A',
+        padding: 10,
+        borderRadius: 20,
+        zIndex: 1,
+    },
+    rescanButton: {
+        position: 'absolute',
+        bottom: 16,
+        alignSelf: 'center',
+        backgroundColor: '#4CAF50',
+        padding: 10,
+        borderRadius: 20,
+    },
 });
-
 export default EditUrl;

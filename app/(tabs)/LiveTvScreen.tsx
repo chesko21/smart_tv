@@ -107,6 +107,12 @@ const LiveTV = () => {
       ) : error ? (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Error: {error.message}</Text>
+          <TouchableOpacity 
+            style={styles.reloadButton}
+            onPress={refetch}
+          >
+            <Text style={styles.reloadButtonText}>Reload</Text>
+          </TouchableOpacity>
         </View>
       ) : selectedGroup ? (
         <>
@@ -161,7 +167,6 @@ const LiveTV = () => {
     </SafeAreaView>
   );
 };
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -183,6 +188,24 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  errorText: {
+    color: 'red',
+    fontSize: 16,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  reloadButton: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginTop: 10,
+  },
+  reloadButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   title: {
     color: "#fff",

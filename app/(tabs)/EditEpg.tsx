@@ -16,8 +16,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Colors from '../../constants/Colors'; 
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
+import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 const EditEpg = () => {
+  const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const { refreshEPG, defaultEpgUrls } = useEPG();
   const [epgUrls, setEpgUrls] = useState([]);
   const [newUrl, setNewUrl] = useState("");
@@ -86,32 +91,50 @@ const EditEpg = () => {
 
     setIsTesting(true);
     try {
+      console.log('Checking URL accessibility:', url);
       const urlExists = await checkUrlExists(url);
       if (!urlExists) {
+        console.log('URL not accessible:', url);
         Alert.alert("The URL cannot be reached. Please check and try again.");
         return;
       }
+      console.log('URL is accessible, fetching EPG data...');
+
+      // Fetch and validate EPG XML data
+      const response = await axios.get(url);
+      console.log('EPG Response status:', response.status);
+      
+      // Validate XML structure
+      if (!response.data || !response.data.includes('<?xml')) {
+        console.log('Invalid EPG XML data received');
+        Alert.alert("Invalid EPG XML format");
+        return;
+      }
+      console.log('Valid XML data received');
 
       const updatedUrls = [...epgUrls];
       if (editIndex !== null) {
         updatedUrls[editIndex] = { url, active: true };
-        ToastAndroid.show('URL updated successfully!', ToastAndroid.SHORT);
-        setEditIndex(null);
       } else if (!updatedUrls.some(item => item.url === url)) {
         updatedUrls.push({ url, active: true });
-        ToastAndroid.show('URL added successfully!', ToastAndroid.SHORT);
       } else {
         Alert.alert("This URL already exists.");
         return;
       }
 
+      // Save URLs and trigger EPG refresh
       await saveEpgUrls(updatedUrls);
       setEpgUrls(updatedUrls);
-      refreshEPG();
+      
+      console.log('Refreshing EPG data with new URL...');
+      await refreshEPG(); // This will trigger EPGInfo to reload with new URL
+      console.log('EPG refresh completed');
+      
+      ToastAndroid.show('EPG URL added and data updated successfully!', ToastAndroid.SHORT);
       setNewUrl('');
     } catch (error) {
-      console.error('Error handling URL:', error);
-      ToastAndroid.show('An error occurred while handling the URL', ToastAndroid.SHORT);
+      console.error('Error details:', error);
+      ToastAndroid.show('Failed to process EPG URL', ToastAndroid.SHORT);
     } finally {
       setIsTesting(false);
     }
@@ -174,127 +197,201 @@ const EditEpg = () => {
   );
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.header}>Manage EPG URLs</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Enter EPG URL"
-        value={newUrl}
-        onChangeText={setNewUrl}
-        onFocus={() => setEditIndex(null)}
-        placeholderTextColor="#A5A5A5" 
-      />
-      <TouchableOpacity style={styles.button} onPress={handleAddOrEditUrl} disabled={isTesting}>
-        {isTesting ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.buttonText}>{editIndex !== null ? 'Edit URL' : 'Add URL'}</Text>
-        )}
-      </TouchableOpacity>
-      {epgUrls.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyState}>
-            No EPG URLs available. Please add a valid URL to ensure accurate EPG data!
-          </Text>
-          {lastUpdated && (
-            <Text style={styles.lastUpdatedText}>
-              Last updated: {lastUpdated.toLocaleString()}
-            </Text>
-          )}
+    <SafeAreaProvider>
+      <View style={styles.container}>
+        <View style={[styles.headerContainer, { marginTop: insets.top }]}>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <Ionicons name="chevron-back" size={16} color="#fff" />
+          </TouchableOpacity>
+          <Text style={styles.title}>Manage EPG URLs</Text>
+          <View style={styles.headerRight} />
         </View>
-      ) : (
+        <View style={styles.inputContainer}>
+          <View style={styles.inputWrapper}>
+            <Ionicons name="link" size={20} color="#666" style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="Enter EPG URL"
+              placeholderTextColor="#999"
+              value={newUrl}
+              onChangeText={setNewUrl}
+              onFocus={() => setEditIndex(null)}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.addButton, (!isValidUrl(newUrl) || isTesting) && styles.disabledButton]}
+            onPress={handleAddOrEditUrl}
+            disabled={!isValidUrl(newUrl) || isTesting}
+          >
+            {isTesting ? (
+              <ActivityIndicator color="#FFF" size="small" />
+            ) : (
+              <Ionicons name={editIndex !== null ? "create" : "add"} size={16} color="white" />
+            )}
+          </TouchableOpacity>
+        </View>
         <FlatList
           data={epgUrls}
           keyExtractor={(item) => item.url}
-          renderItem={renderItem}
+          contentContainerStyle={styles.listContainer}
+          renderItem={({ item, index }) => (
+            <View style={styles.listItem}>
+              <View style={styles.urlInfoContainer}>
+                <Ionicons 
+                  name={item.active ? "globe" : "globe-outline"} 
+                  size={15} 
+                  color={item.active ? "#4CAF50" : "#757575"} 
+                  style={styles.urlIcon} 
+                />
+                <Text style={[styles.urlText, !item.active && styles.inactiveText]}>
+                  {item.url}
+                </Text>
+              </View>
+    
+              <View style={styles.actionContainer}>
+                <Switch
+                  value={item.active}
+                  onValueChange={() => toggleUrlActive(item.url)}
+                  trackColor={{ false: "#ddd", true: "#4CAF50" }}
+                  thumbColor={item.active ? "#fff" : "#FF5733"}
+                />
+                <TouchableOpacity
+                  onPress={() => handleEditUrl(index)}
+                  style={styles.iconButton}
+                >
+                  <Ionicons name="create-outline" size={15} color="#4CAF50" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => handleDeleteUrl(index)}
+                  style={styles.deleteButton}
+                >
+                  <Ionicons name="trash-outline" size={15} color="#FF5733" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
         />
-      )}
-    </View>
+      </View>
+    </SafeAreaProvider>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
     backgroundColor: '#121212',
   },
-  header: {
-    fontSize: 28,
-    fontWeight: '700',
-    marginBottom: 20,
-    color: '#FFFFFF',
-    textAlign: 'center',
+  headerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    backgroundColor: '#1E1E1E',
+    borderBottomWidth: 1,
+    borderBottomColor: '#2A2A2A',
+  },
+  backButton: {
+    padding: 10,
+    borderRadius: 20,
+    backgroundColor: '#FF5733',
+  },
+  headerRight: {
+    width: 40,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    padding: 16,
+    backgroundColor: '#1E1E1E',
+    marginTop: 16,
+    marginHorizontal: 16,
+    borderRadius: 12,
+  },
+  inputWrapper: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2A2A2A',
+    borderRadius: 8,
+    marginRight: 8,
+    paddingHorizontal: 12,
+  },
+  inputIcon: {
+    marginRight: 8,
   },
   input: {
-    height: 50,
-    borderColor: '#444', 
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 15,
-    marginBottom: 15,
-    fontSize: 16,
-    color: '#FFFFFF',
-    backgroundColor: '#1E1E1E',
-  },
-  button: {
-    backgroundColor: '#BB86FC', 
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  buttonText: {
+    flex: 1,
+    height: 45,
     color: '#fff',
-    fontWeight: '600',
     fontSize: 16,
   },
-  card: {
-    backgroundColor: '#1E1E1E',
-    borderRadius: 10,
-    marginVertical: 8,
-    padding: 15,
-    elevation: 3,
-  },
-  cardContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  actionButton: {
+    width: 45,
+    height: 45,
+    justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: 8,
+  },
+  addButton: {
+    backgroundColor: '#4CAF50',
+  },
+  disabledButton: {
+    backgroundColor: '#666666',
+    opacity: 0.7,
+  },
+  listContainer: {
+    padding: 16,
+  },
+  listItem: {
+    backgroundColor: '#1E1E1E',
+    borderRadius: 12,
+    marginBottom: 12,
+    padding: 16,
+    elevation: 2,
+  },
+  urlInfoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  urlIcon: {
+    marginRight: 8,
   },
   urlText: {
     flex: 1,
-    fontSize: 16,
-    color: '#FFFFFF',
+    color: '#fff',
+    fontSize: 14,
   },
   inactiveText: {
-    color: '#A5A5A5',
-    textDecorationLine: 'line-through', 
+    color: '#757575',
+    textDecorationLine: 'line-through',
   },
   actionContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'flex-end',
+    borderTopWidth: 1,
+    borderTopColor: '#2A2A2A',
+    paddingTop: 12,
   },
   iconButton: {
-    marginLeft: 15,
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#2A2A2A',
+    marginLeft: 12,
   },
-  deleteButton: { 
-    padding: 5, 
-    borderRadius: 8,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  emptyState: {
-    textAlign: 'center',
-    color: '#A5A5A5',
-    fontSize: 16,
-    marginBottom: 10,
-  },
-  lastUpdatedText: {
-    color: '#B0BEC5',
-    marginTop: 5,
+  deleteButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#2A2A2A',
+    marginLeft: 12,
   },
 });
 

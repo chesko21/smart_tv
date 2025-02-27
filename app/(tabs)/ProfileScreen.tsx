@@ -243,12 +243,12 @@ const ProfileScreen = () => {
             console.warn("URL video tidak ditemukan untuk item riwayat:", item);
             return;
         }
-        setPipMode(false); // Set PiP mode to normal
-        navigation.navigate('PlayerScreen' as never, {
+        setPipMode(false); 
+        navigation.navigate('PlayerScreen', {
             url: item.url,
             name: item.name,
             logo: item.logo,
-        } as never);
+        });
     };
 
     const renderHistoryItem = ({ item }) => {
@@ -315,7 +315,6 @@ const ProfileScreen = () => {
                 keyExtractor={(item, index) => index.toString()}
                 numColumns={4}
                 renderItem={renderHistoryItem}
-                onLayout={() => console.log("Current watch history:", watchHistory)}
                 ItemSeparatorComponent={() => <View style={styles.separator} />}
                 refreshControl={
                     <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -493,6 +492,7 @@ const styles = StyleSheet.create({
     },
     separator: {
         height: 5,
+        padding: 10,
     },
     centeredView: {
         flex: 1,

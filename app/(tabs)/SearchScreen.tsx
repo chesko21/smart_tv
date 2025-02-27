@@ -21,14 +21,10 @@ const SearchScreen = () => {
     const { setPipMode } = usePip();
     const allChannels = channels ?? [];
 
-    const filteredChannels = searchPressed
-        ? Array.from(
-            new Map(
-                allChannels
-                    .filter(channel => channel.name?.toLowerCase().includes(searchQuery.toLowerCase()))
-                    .map(channel => [channel.tvgId || channel.name, channel])
-            ).values()
-        )
+    const filteredChannels = searchPressed && searchQuery.trim() !== ""
+        ? allChannels.filter(channel => 
+            channel.name?.toLowerCase().includes(searchQuery.toLowerCase().trim())
+          )
         : [];
 
     const showToast = (message) => {
@@ -36,18 +32,35 @@ const SearchScreen = () => {
             type: 'error',
             text1: message,
             position: 'top',
+            visibilityTime: 2000,
         });
     };
 
-    const handleSearch = debounce((query) => {
-        setSearchQuery(query);
+    const handleSearch = (text) => {
+        setSearchQuery(text);
+        if (searchPressed) {
+            setSearchPressed(false);
+        }
+    };
+
+    const performSearch = () => {
+        const trimmedQuery = searchQuery.trim();
+        if (trimmedQuery === "") {
+            showToast("Please enter a channel name");
+            return;
+        }
         setSearchPressed(true);
-    }, 300);
+    };
+
+    const handleClearSearch = () => {
+        setSearchQuery("");
+        setSearchPressed(false);
+    };
 
     const onRefresh = async () => {
         setRefreshing(true);
-        await refetch(); // Refresh the channel data
-        setRefreshing(false); // Stop refreshing
+        await refetch();
+        setRefreshing(false);
     };
 
     return (
@@ -56,21 +69,32 @@ const SearchScreen = () => {
                 <Text style={styles.title}>Search TV Channels</Text>
 
                 <View style={styles.searchContainer}>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Search for a channel..."
-                        value={searchQuery}
-                        onChangeText={handleSearch}
-                    />
+                    <View style={styles.inputContainer}>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Search for a channel..."
+                            placeholderTextColor="#666"
+                            value={searchQuery}
+                            onChangeText={handleSearch}
+                            onSubmitEditing={performSearch}
+                            returnKeyType="search"
+                        />
+                        {searchQuery.length > 0 && (
+                            <TouchableOpacity
+                                style={styles.clearButton}
+                                onPress={handleClearSearch}
+                            >
+                                <Text style={styles.clearButtonText}>×</Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
                     <TouchableOpacity
-                        style={styles.searchButton}
-                        onPress={() => {
-                            if (searchQuery.trim() === "") {
-                                showToast("Please enter a text");
-                                return;
-                            }
-                            setSearchPressed(true);
-                        }}
+                        style={[
+                            styles.searchButton,
+                            !searchQuery.trim() && styles.searchButtonDisabled
+                        ]}
+                        onPress={performSearch}
+                        disabled={!searchQuery.trim()}
                     >
                         <Text style={styles.searchButtonText}>Search</Text>
                     </TouchableOpacity>
@@ -78,6 +102,10 @@ const SearchScreen = () => {
 
                 {loading && <ActivityIndicator size="large" color="#007bff" style={styles.loader} />}
                 {error && <Text style={styles.error}>{error}</Text>}
+
+                {searchPressed && filteredChannels.length === 0 && !loading && (
+                    <Text style={styles.noResults}>No results found.</Text>
+                )}
 
                 {searchPressed && (
                     <FlatList
@@ -113,10 +141,6 @@ const SearchScreen = () => {
                         }
                     />
                 )}
-
-                {searchPressed && filteredChannels.length === 0 && !loading && (
-                    <Text style={styles.noResults}>No results found.</Text>
-                )}
             </View>
             <Toast />
         </SafeAreaView>
@@ -140,22 +164,46 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         marginBottom: 16,
+        gap: 8,
+    },
+    inputContainer: {
+        flex: 1,
+        position: 'relative',
     },
     input: {
-        flex: 1,
         height: 42,
         borderColor: "#007bff",
         borderWidth: 1,
         borderRadius: 8,
         paddingHorizontal: 12,
+        paddingRight: 40,
         backgroundColor: "#fff",
+        color: "#000",
+    },
+    clearButton: {
+        position: 'absolute',
+        right: 8,
+        height: 42,
+        width: 30,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    clearButtonText: {
+        color: '#666',
+        fontSize: 24,
+        fontWeight: 'bold',
+        lineHeight: 24,
     },
     searchButton: {
         backgroundColor: "#007bff",
         paddingVertical: 10,
         paddingHorizontal: 16,
         borderRadius: 8,
-        marginLeft: 8,
+        minWidth: 80,
+        alignItems: 'center',
+    },
+    searchButtonDisabled: {
+        backgroundColor: "#666",
     },
     searchButtonText: {
         color: "#fff",
@@ -198,7 +246,7 @@ const styles = StyleSheet.create({
         textAlign: "center",
         fontSize: 16,
         color: "#fff",
-        marginTop: 20,
+        marginBottom: 20,
     },
 });
 

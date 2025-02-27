@@ -10,6 +10,7 @@ import DrawerNavigator from "./(tabs)/DrawerNavigator";
 import { Ionicons } from '@expo/vector-icons';
 import { PipProvider } from '../contexts/PipContext';
 import FloatingPipPlayer from '../components/FloatingPipPlayer';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -65,82 +66,72 @@ export default function Layout() {
 
     useEffect(() => {
         if (Platform.OS === "android") {
-            const hideNavigationBar = async () => {
+            const setupAndroid = async () => {
                 await NavigationBar.setVisibilityAsync("hidden");
                 await NavigationBar.setBehaviorAsync("overlay-swipe");
+                // Remove the default orientation lock
+                // await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
             };
-            hideNavigationBar();
+            setupAndroid();
 
             return () => {
                 NavigationBar.setVisibilityAsync("visible");
             };
         }
-
-        ScreenOrientation.unlockAsync();
     }, []);
 
-    if (isLoading) {
-        return (
-            <View style={styles.loadingContainer}>
-                <LottieView 
-                    source={loadingAnimation} 
-                    autoPlay 
-                    loop 
-                    style={[
-                        styles.lottieAnimation,
-                        { width: moderateScale(200), height: moderateScale(200) }
-                    ]} 
-                />
-                <Text style={styles.loadingText}>Loading...</Text>
-            </View>
-        );
-    }
-
-    const bannerTopPosition = Platform.OS === 'android' ? 
-        dimensions.window.height * 0.05 : // 5% from top on iOS
-        0; // 0 for Android
-
     return (
-        <PipProvider>
-            <StatusBar style="light" translucent={true} backgroundColor="transparent" hidden={!isOnline} />  
-            <SafeAreaView style={styles.safeArea}>
-                {!isOnline && (
-                    <View style={[
-                        styles.banner, 
-                        { 
-                            backgroundColor: "red",
-                            top: bannerTopPosition,
-                            height: moderateScale(50)
-                        }
-                    ]}>
-                        <Ionicons name="cloud-offline" size={moderateScale(20)} color="white" style={styles.icon} />
-                        <Text style={[styles.text, { fontSize: moderateScale(16) }]}>No Internet Connection</Text>
-                    </View>
-                )}
-                {showBackOnline && (
-                    <View style={[
-                        styles.banner,
-                        { 
-                            backgroundColor: "green",
-                            top: bannerTopPosition,
-                            height: moderateScale(50)
-                        }
-                    ]}>
-                        <Ionicons name="cloud-done" size={moderateScale(20)} color="white" style={styles.icon} />
-                        <Text style={[styles.text, { fontSize: moderateScale(16) }]}>Back Online</Text>
-                    </View>
-                )}
-                <DrawerNavigator />
-                <FloatingPipPlayer />
-            </SafeAreaView>
-        </PipProvider>
+        <SafeAreaProvider>
+            <PipProvider>
+                <View style={styles.container}>
+                    <StatusBar style="light" translucent={true} backgroundColor="transparent" />  
+                    {isLoading ? (
+                        <View style={styles.loadingContainer}>
+                            <LottieView
+                                source={loadingAnimation}
+                                autoPlay
+                                loop
+                                style={styles.lottieAnimation}
+                            />
+                            <Text style={styles.loadingText}>Loading...</Text>
+                        </View>
+                    ) : (
+                        <>
+                            {!isOnline && (
+                                <View style={[styles.banner, { 
+                                    backgroundColor: "red",
+                                    top: Platform.OS === 'ios' ? moderateScale(50) : 0,
+                                    height: moderateScale(50)
+                                }]}>
+                                    <Ionicons name="cloud-offline" size={moderateScale(20)} color="white" style={styles.icon} />
+                                    <Text style={[styles.text, { fontSize: moderateScale(16) }]}>No Internet Connection</Text>
+                                </View>
+                            )}
+                            {showBackOnline && (
+                                <View style={[styles.banner, { 
+                                    backgroundColor: "green",
+                                    top: Platform.OS === 'ios' ? moderateScale(50) : 0,
+                                    height: moderateScale(50)
+                                }]}>
+                                    <Ionicons name="cloud-done" size={moderateScale(20)} color="white" style={styles.icon} />
+                                    <Text style={[styles.text, { fontSize: moderateScale(16) }]}>Back Online</Text>
+                                </View>
+                            )}
+                            <DrawerNavigator />
+                            <FloatingPipPlayer />
+                        </>
+                    )}
+                </View>
+            </PipProvider>
+        </SafeAreaProvider>
     );
 }
 
 const styles = StyleSheet.create({
-    safeArea: {
+    container: {
         flex: 1,
         backgroundColor: "#000",
+        position: 'relative',
     },
     loadingContainer: {
         flex: 1,

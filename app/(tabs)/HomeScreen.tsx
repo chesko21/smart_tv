@@ -99,6 +99,22 @@ export default function Home() {
     );
   }, [channels]);
 
+  // Add this with other useMemo hooks
+  const filteredVOD = useMemo(() => {
+    const vodKeywords = [ "movies", "movie", "film", "films", "bioskop", "cinema",
+      "sinema", "vod", "video on demand", "box office",
+      "action", "adventure", "comedy", "drama", "horror", "thriller",
+      "romance", "documentary", "animation", "anime", "fantasy",
+      "sci-fi", "mystery", "crime", "family", "musical",
+      "series", "tv series", "drama series", "web series",
+      "season", "episode", "show", "tv show", "reality show",
+      "netflix", "disney", "prime", "hbo", "hulu", "apple tv", "komedi", "lk21", "ftv", 
+      "hiburan", "hiburan", "entertainment", "entertainment", "tv show", "tv series", "tv series",];
+    return channels.filter((channel) =>
+      vodKeywords.some((keyword) => channel.group?.toLowerCase()?.includes(keyword))
+    );
+  }, [channels]);
+
   useEffect(() => {
     if (filteredSports.length > 0) {
       setLimitedSports(getRandomChannels(filteredSports, 40));
@@ -238,15 +254,20 @@ export default function Home() {
           onPress={() => navigation.navigate("LiveTvScreen")}
         >
           <Text style={styles.navtext}>Watch Live TV</Text>
+          <Text style={styles.channelCount}>
+            {channels?.length || 0} Channels
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.navButton}
           onPress={() => navigation.navigate("VodScreen")}
         >
           <Text style={styles.navtext}>Watch VOD</Text>
+          <Text style={styles.channelCount}>
+            {filteredVOD?.length || 0} Movies
+          </Text>
         </TouchableOpacity>
       </View>
-
       <Text style={styles.sectionTitle}>Sport</Text>
 
       <FlatList

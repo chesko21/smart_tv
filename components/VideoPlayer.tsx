@@ -1,11 +1,11 @@
 import React, { useRef, useState, useEffect } from "react";
-
+import * as ScreenOrientation from 'expo-screen-orientation';
 import type {
     VideoProperties,
     DRMType as VideoDRMType,
     OnLoadData,
     OnBufferData,
-    OnErrorData,
+    OnError,
     OnPictureInPictureStatusChangedData
 } from "react-native-video";
 
@@ -31,6 +31,7 @@ import Toast from "react-native-toast-message";
 import { Buffer } from "buffer";
 import Icon from "react-native-vector-icons/MaterialIcons";
 import { Channel } from "@/hooks/M3uParse";
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type DRMType = VideoDRMType;
 type VideoRef = React.RefObject<VideoProperties>;
@@ -53,20 +54,17 @@ interface StreamConfig {
 }
 
 const configureDrm = (channel: any): DrmConfig => {
-    // Return an empty config if the channel is not provided
     if (!channel) return {};
 
     const drmConfig: DrmConfig = {};
 
-    // Handle ClearKey DRM
     if (channel.license_type?.includes("clearkey") && channel.license_key) {
         const [kidHex, keyHex] = channel.license_key.split(":");
-        // Validate KID and Key
         if (!kidHex || !keyHex || kidHex.length !== 32 || keyHex.length !== 32) {
-            console.error("Invalid KID or Key for ClearKey DRM.");
+           // console.error("Invalid KID or Key for ClearKey DRM.");
             return {};
         }
-        drmConfig.type = "clearkey";
+        drmConfig.type = "clearkey" as DRMType;
         drmConfig.clearKeys = JSON.stringify({
             keys: [
                 {
@@ -78,14 +76,12 @@ const configureDrm = (channel: any): DrmConfig => {
             ],
         });
     } 
-    // Handle Widevine DRM
     else if (channel.license_type?.includes("widevine") && channel.license_key) {
-        drmConfig.type = "widevine";
+        drmConfig.type = "widevine" as DRMType;
         drmConfig.licenseServer = channel.license_key.trim();
     } 
-    // Handle PlayReady DRM
     else if (channel.license_type?.includes("playready") && channel.license_key) {
-        drmConfig.type = "playready";
+        drmConfig.type = "playready" as DRMType;
         drmConfig.licenseServer = channel.license_key.trim();
     } else {
         console.warn("No valid DRM configuration for the provided channel.");
@@ -293,6 +289,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     const toggleFullscreen = () => {
         if (playerRef.current) {
+            if (!isFullscreen) {
+                ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE_RIGHT);
+            }
             playerRef.current.presentFullscreenPlayer();
         }
     };
@@ -350,25 +349,41 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
         if (resolution >= 480) return 'SD';
         return 'SD';
     };
-
+    const insets = useSafeAreaInsets();
     return (
-        <>
-            <StatusBar backgroundColor="#000" barStyle="light-content" />
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
+            {!isFullscreen && <StatusBar backgroundColor="#000" barStyle="light-content" />}
             <ScrollView
-                contentContainerStyle={styles.scrollViewContent}
+                contentContainerStyle={[
+                    styles.scrollViewContent,
+                    isFullscreen && { width: '100%', height: '100%', margin: 0, padding: 0 },
+                    { paddingTop: isFullscreen ? 0 : insets.top }
+                ]}
+                scrollEnabled={!isFullscreen}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
             >
-                <View style={[styles.videoContainer, { width: videoWidth, height: videoHeight }, style]}>
+                <View style={[
+                    styles.videoContainer, 
+                    { 
+                        width: videoWidth, 
+                        height: videoHeight,
+                        marginBottom: insets.bottom 
+                    }, 
+                    style,
+                    isFullscreen && { margin: 0, padding: 0 }
+                ]}>
                     <TouchableOpacity style={styles.touchableArea} activeOpacity={1} onPress={handleUserInteraction}>
                         <Video
                             ref={playerRef}
                             source={{
                                 uri: url,
                                 type: streamConfig.isHLS ? 'm3u8' : undefined,
-                                
                                 drm: drmConfig.type ? drmConfig : undefined,
                             }}
-                            style={streamConfig.isRadio ? styles.audioPlayer : styles.video}
+                            style={[
+                                streamConfig.isRadio ? styles.audioPlayer : styles.video,
+                                isFullscreen && { width: '100%', height: '100%', backgroundColor: '#000' }
+                            ]}
                             audioOnly={streamConfig.isRadio}
                             playInBackground={streamConfig.isRadio}
                             ignoreSilentSwitch={streamConfig.isRadio ? "ignore" : "obey"}
@@ -377,14 +392,19 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
                                 console.error('Playback Error:', error);
                                 handleError(error);
                             }}
-                            resizeMode="contain"
+                            resizeMode={isFullscreen ? "contain" : "contain"}
                             onLoadStart={handleLoadStart}
                             onLoad={handleLoad}
                             onBuffer={handleBuffer}
                             paused={!isPlaying}
-                            controls={false}
-                            onFullscreenPlayerWillPresent={() => setIsFullscreen(true)}
-                            onFullscreenPlayerWillDismiss={() => setIsFullscreen(false)}
+                            onFullscreenPlayerWillPresent={() => {
+                                setIsFullscreen(true);
+                                ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE_RIGHT);
+                            }}
+                            onFullscreenPlayerWillDismiss={() => {
+                                setIsFullscreen(false);
+                                ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+                            }}
                             selectedVideoTrack={{ type: selectedResolution ? "resolution" : "auto", value: selectedResolution || undefined }}
                             pictureInPicture={true}
                             onPictureInPictureStatusChanged={handlePipModeChange}
@@ -507,7 +527,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
                     )}
                 </View>
             </ScrollView>
-        </>
+        </SafeAreaView>
     );
 };
 
@@ -521,10 +541,20 @@ const styles = StyleSheet.create({
     },
     touchableArea: {
         flex: 1,
+        width: "100%",
+        height: "100%",
     },
     video: {
         width: "100%",
         height: "100%",
+        flex: 1,
+        backgroundColor: '#000',
+    },
+    container: {
+        position: "relative",
+        backgroundColor: "#000",
+        flex: 1,
+        width: "100%",
     },
     overlay: {
         position: "absolute",
@@ -536,7 +566,6 @@ const styles = StyleSheet.create({
         alignItems: "center",
         backgroundColor: "rgba(0, 0, 0, 0.7)",
         borderRadius: 10,
-        padding: 10,
     },
     overlayText: {
         color: "#FFF",
