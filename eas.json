@@ -1,4 +1,5 @@
 {
+  "owner": "chesko25",
   "cli": {
     "version": ">= 15.0.2",
     "appVersionSource": "remote"
@@ -15,14 +16,8 @@
       "autoIncrement": true,
       "android": {
         "gradleCommand": ":app:assembleRelease",
-        "image": "default"
-      },
-      "ios": {
-        "image": "latest"
+        "image": "ubuntu-20.04"
       }
     }
-  },
-  "submit": {
-    "production": {}
   }
 }
