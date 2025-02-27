@@ -1,10 +1,8 @@
-module.exports = {
-    project: {
-      android: {
-        unstable_reactLegacyComponentNames: ['Video'],
-      },
-      ios: {
-        unstable_reactLegacyComponentNames: ['Video'],
-      },
-    },
-  };
+export const project = {
+  android: {
+    unstable_reactLegacyComponentNames: ['Video'],
+  },
+  ios: {
+    unstable_reactLegacyComponentNames: ['Video'],
+  },
+};

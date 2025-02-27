@@ -7,7 +7,7 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const FloatingPipPlayer = () => {
   const { isInPipMode, pipUrl, pipChannel, setPipMode } = usePip();
-  const [pipPosition, setPipPosition] = useState({ x: 16, y: 16 }); 
+  const [pipPosition, setPipPosition] = useState({ x: SCREEN_WIDTH - 200, y: SCREEN_HEIGHT - 150 }); // Default position
   const draggedPosition = useRef(new Animated.ValueXY(pipPosition)).current;
 
   const panResponder = useRef(
@@ -23,32 +23,31 @@ const FloatingPipPlayer = () => {
           null,
           { dx: draggedPosition.x, dy: draggedPosition.y }
         ],
-        { useNativeDriver: false } 
+        { useNativeDriver: false }
       ),
       onPanResponderRelease: (_, gestureState) => {
         const newX = Math.min(
           Math.max(draggedPosition.x._offset + gestureState.dx, 0),
-          SCREEN_WIDTH - 180
+          SCREEN_WIDTH - 200 // Keep it within screen bounds
         );
         const newY = Math.min(
           Math.max(draggedPosition.y._offset + gestureState.dy, 0),
-          SCREEN_HEIGHT - 100
+          SCREEN_HEIGHT - 150 // Keep it within screen bounds
         );
 
         setPipPosition({ x: newX, y: newY });
-
         draggedPosition.setOffset({ x: newX, y: newY });
-        draggedPosition.setValue({ x: 0, y: 0 }); 
+        draggedPosition.setValue({ x: 0, y: 0 });
       },
     })
   ).current;
 
-  const handlePipModeChange = (isInPip) => {
+  const handlePipModeChange = (isInPip: boolean) => {
     setPipMode(isInPip);
   };
 
   const handlePress = () => {
-    setPipMode(false); // Set PiP mode to normal
+    setPipMode(false); 
   };
 
   if (!isInPipMode || !pipUrl) return null;
@@ -83,10 +82,12 @@ const styles = StyleSheet.create({
   pipContainer: {
     position: 'absolute',
     width: 180,
-    height: 100,
+    height: 120,
     zIndex: 999999,
     backgroundColor: '#000',
     borderRadius: 8,
+    borderColor: "#fff",
+    borderWidth: 2,
     elevation: 5,
     shadowOpacity: 0.3,
   },

@@ -1,3 +1,3 @@
-import { EventEmitter } from "expo-modules-core";
+import { EventEmitter } from 'events';
 
-export const userUpdateEmitter = new EventEmitter();
+export const urlChangeEmitter = new EventEmitter();

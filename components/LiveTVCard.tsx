@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState , useEffect } from "react";
 import { View, Text, Image, TouchableOpacity, StyleSheet, ActivityIndicator } from "react-native";
 
 import defaultLogo from "../assets/images/tv_banner.png";
@@ -25,6 +25,25 @@ const truncateName = (name: string, limit: number) => {
 const LiveTVCard: React.FC<ChannelProps> = ({ channel, onPress }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const [isTimeout, setIsTimeout] = useState(false);
+
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    
+    if (channel.logo && isLoading) {
+      timeoutId = setTimeout(() => {
+        setIsTimeout(true);
+        setIsLoading(false);
+      }, 3000);
+    }
+
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [channel.logo, isLoading]);
+
 
   return (
     <TouchableOpacity
@@ -41,12 +60,18 @@ const LiveTVCard: React.FC<ChannelProps> = ({ channel, onPress }) => {
           </View>
         )}
         <Image
-          source={channel.logo && !hasError ? { uri: channel.logo } : defaultLogo}
+          source={(channel.logo && !hasError && !isTimeout) ? { uri: channel.logo } : defaultLogo}
           defaultSource={defaultLogo}
           style={[styles.image, isLoading && styles.hiddenImage]}
           resizeMode="cover"
-          onLoadStart={() => setIsLoading(true)}
-          onLoad={() => setIsLoading(false)}
+          onLoadStart={() => {
+            setIsLoading(true);
+            setIsTimeout(false);
+          }}
+          onLoad={() => {
+            setIsLoading(false);
+            setIsTimeout(false);
+          }}
           onError={() => {
             setHasError(true);
             setIsLoading(false);

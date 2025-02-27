@@ -18,7 +18,7 @@ const baseHeight = 812;
 
 const scale = SCREEN_WIDTH / baseWidth;
 const verticalScale = SCREEN_HEIGHT / baseHeight;
-const moderateScale = (size: number, factor = 0.5) => size + (scale - 1) * factor;
+const moderateScale = (size: number, factor = 0.4) => size + (scale - 1) * factor;
 
 export default function Layout() {
     const [isOnline, setIsOnline] = useState(true);

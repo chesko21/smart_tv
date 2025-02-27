@@ -119,7 +119,7 @@ const Vod = () => {
         <TouchableOpacity
       style={styles.card}
       onPress={() => {
-        setPipMode(false); // Set PiP mode to normal
+        setPipMode(false);
         navigation.navigate('PlayerScreen', { url: item.url });
       }}
     >

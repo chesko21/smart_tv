@@ -99,7 +99,7 @@ const HistoryTitle = () => {
     );
 };
 
-const Profile = () => {
+const ProfileScreen = () => {
     const navigation = useNavigation();
     const { setPipMode } = usePip();
     const [avatarError, setAvatarError] = useState(false);
@@ -583,4 +583,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default Profile;
+export default ProfileScreen;

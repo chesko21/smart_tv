@@ -1,4 +1,16 @@
 import React, { useRef, useState, useEffect } from "react";
+
+import type {
+    VideoProperties,
+    DRMType as VideoDRMType,
+    OnLoadData,
+    OnBufferData,
+    OnErrorData,
+    OnPictureInPictureStatusChangedData
+} from "react-native-video";
+
+import { urlChangeEmitter } from "../utils/events";
+
 import {
     View,
     ActivityIndicator,
@@ -11,14 +23,18 @@ import {
     Modal,
     Platform,
     AppState,
-    StatusBar
+    StatusBar,
+    ViewStyle
 } from "react-native";
 import Video from "react-native-video";
 import Toast from "react-native-toast-message";
 import { Buffer } from "buffer";
 import Icon from "react-native-vector-icons/MaterialIcons";
+import { Channel } from "@/hooks/M3uParse";
 
-type DRMType = "widevine" | "playready" | "fairplay" | "clearkey";
+type DRMType = VideoDRMType;
+type VideoRef = React.RefObject<VideoProperties>;
+
 
 interface DrmConfig {
     type?: DRMType;
@@ -37,13 +53,16 @@ interface StreamConfig {
 }
 
 const configureDrm = (channel: any): DrmConfig => {
+    // Return an empty config if the channel is not provided
     if (!channel) return {};
 
     const drmConfig: DrmConfig = {};
 
+    // Handle ClearKey DRM
     if (channel.license_type?.includes("clearkey") && channel.license_key) {
         const [kidHex, keyHex] = channel.license_key.split(":");
-        if (!kidHex || !keyHex) {
+        // Validate KID and Key
+        if (!kidHex || !keyHex || kidHex.length !== 32 || keyHex.length !== 32) {
             console.error("Invalid KID or Key for ClearKey DRM.");
             return {};
         }
@@ -58,20 +77,22 @@ const configureDrm = (channel: any): DrmConfig => {
                 },
             ],
         });
-    } else if (channel.license_type?.includes("widevine") && channel.license_key) {
-        return {
-            type: "widevine",
-            licenseServer: channel.license_key.trim(),
-        };
-    } else if (channel.license_type?.includes("playready") && channel.license_key) {
-        return {
-            type: "playready",
-            licenseServer: channel.license_key.trim(),
-        };
+    } 
+    // Handle Widevine DRM
+    else if (channel.license_type?.includes("widevine") && channel.license_key) {
+        drmConfig.type = "widevine";
+        drmConfig.licenseServer = channel.license_key.trim();
+    } 
+    // Handle PlayReady DRM
+    else if (channel.license_type?.includes("playready") && channel.license_key) {
+        drmConfig.type = "playready";
+        drmConfig.licenseServer = channel.license_key.trim();
+    } else {
+        console.warn("No valid DRM configuration for the provided channel.");
     }
+
     return drmConfig;
 };
-
 
 const detectStreamType = (url: string): StreamConfig => {
     const isHLS = /\.(m3u8|m3u|ts)($|\?)|\/manifest\/|\/playlist\/|\/master\./i.test(url);
@@ -85,26 +106,20 @@ const detectStreamType = (url: string): StreamConfig => {
 
 
 interface VideoPlayerProps {
-
     url: string;
-
     channel: Channel;
-
     onLoadStart: () => void;
-
     onLoad: () => void;
-
     onError: () => void;
-
+    onBuffer?: (data: OnBufferData) => void;
     paused: boolean;
-
     style?: ViewStyle;
-
+    maxHeight?: number;
+    onRefresh?: () => void;
     onPipModeChange?: (isInPipMode: boolean) => void;
-
     isPipEnabled?: boolean;
-
 }
+
 
 
 const VideoPlayer: React.FC<VideoPlayerProps> = ({
@@ -120,7 +135,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     onRefresh,
     onPipModeChange
 }) => {
-    const playerRef = useRef(null);
+    const playerRef = useRef < VideoProperties > (null);
+
     const { width, height } = useWindowDimensions();
     const [videoWidth] = useState(width);
     const [videoHeight] = useState(maxHeight ? Math.min(maxHeight, height * 0.4) : height * 0.4);
@@ -167,7 +183,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
         onLoadStart?.();
     };
 
-    const handleLoad = (onLoadData: any) => {
+    const handleLoad = (onLoadData: OnLoadData) => {
+
         setLoading(false);
         setBuffering(false);
         setIsPlaying(true);
@@ -176,8 +193,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
         setVideoTracks(tracks);
 
         if (tracks.length > 0) {
-            const lowestResolutionTrack = tracks.reduce((prev, current) => (current.height < prev.height ? current : prev));
-            const lowestResolutionIndex = tracks.findIndex(track => track === lowestResolutionTrack);
+            const lowestResolutionTrack = tracks.reduce((prev: { height: number; }, current: { height: number; }) => (current.height < prev.height ? current : prev));
+            const lowestResolutionIndex = tracks.findIndex((track: any) => track === lowestResolutionTrack);
             setSelectedTrack(lowestResolutionIndex);
         }
 
@@ -190,7 +207,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
         onLoad?.();
     };
 
-    const handleError = (e: any) => {
+    const handleError = (e: OnErrorData) => {
+
         const errorMessage = e.error?.errorString || e.error?.error || "An error occurred.";
         setLoading(false);
         setBuffering(false);
@@ -202,7 +220,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
         onError?.(error);
     };
 
-    const handleBuffer = ({ isBuffering }: { isBuffering: boolean }) => {
+    const handleBuffer = ({ isBuffering }: OnBufferData) => {
+
         setBuffering(isBuffering);
         onBuffer?.({ isBuffering });
     };
@@ -293,13 +312,22 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
 
     useEffect(() => {
+        const handleUrlChange = () => {
+            handleRefresh();
+        };
+
+        urlChangeEmitter.on('urlChanged', handleUrlChange);
+
         return () => {
             if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
             if (qualityButtonTimeoutRef.current) clearTimeout(qualityButtonTimeoutRef.current);
+            urlChangeEmitter.off('urlChanged', handleUrlChange);
         };
     }, []);
 
-    const handlePipModeChange = (event: { isInPictureInPictureMode: boolean }) => {
+
+    const handlePipModeChange = (event: OnPictureInPictureStatusChangedData) => {
+
         setIsInPipMode(event.isInPictureInPictureMode);
         setIsPlaying(!event.isInPictureInPictureMode);
         onPipModeChange?.(event.isInPictureInPictureMode);
@@ -320,7 +348,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const getQualityBadge = (resolution: number) => {
         if (resolution >= 720) return 'HD';
         if (resolution >= 480) return 'SD';
-        return 'LD';
+        return 'SD';
     };
 
     return (
@@ -337,6 +365,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
                             source={{
                                 uri: url,
                                 type: streamConfig.isHLS ? 'm3u8' : undefined,
+                                
                                 drm: drmConfig.type ? drmConfig : undefined,
                             }}
                             style={streamConfig.isRadio ? styles.audioPlayer : styles.video}
@@ -365,7 +394,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
                     {showControls && (
                         <View style={styles.customControls}>
                             <TouchableOpacity onPress={togglePlay} style={styles.controlButton}>
-                                <Icon name={isPlaying ? "pause" : "play-arrow"} size={24} color="#FFF" />
+                                <Icon name={isPlaying ? "pause" : "play-arrow"} size={16} color="#FFF" />
                             </TouchableOpacity>
 
                             <View style={styles.rightControls}>
@@ -376,7 +405,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
                                     >
                                         <Icon
                                             name={isInPipMode ? "picture-in-picture-alt" : "picture-in-picture-alt"}
-                                            size={24}
+                                            size={16}
                                             color="#FFF"
                                         />
                                     </TouchableOpacity>
@@ -386,11 +415,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
                                     setShowQualityButton(true);
                                     resetQualityButtonTimer();
                                 }}>
-                                    <Icon name="settings" size={24} color="#FFF" />
+                                    <Icon name="settings" size={16} color="#FFF" />
                                 </TouchableOpacity>
 
                                 <TouchableOpacity onPress={toggleFullscreen} style={styles.controlButton}>
-                                    <Icon name={isFullscreen ? "fullscreen-exit" : "fullscreen"} size={24} color="#FFF" />
+                                    <Icon name={isFullscreen ? "fullscreen-exit" : "fullscreen"} size={16} color="#FFF" />
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -427,7 +456,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
                                         onPress={() => handleResolutionSelect(0)}
                                     >
                                         <View style={styles.menuItemLeft}>
-                                            {!selectedResolution && <Icon name="check" size={20} color="#FFF" />}
+                                            {!selectedResolution && <Icon name="check" size={16} color="#FFF" />}
                                             <Text style={styles.resolutionText}>Auto</Text>
                                         </View>
                                     </TouchableOpacity>
@@ -442,7 +471,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
                                             onPress={() => handleResolutionSelect(resolution)}
                                         >
                                             <View style={styles.menuItemLeft}>
-                                                {selectedResolution === resolution && <Icon name="check" size={20} color="#FFF" />}
+                                                {selectedResolution === resolution && <Icon name="check" size={16} color="#FFF" />}
                                                 <Text style={styles.resolutionText}>{resolution}p</Text>
                                             </View>
                                             <View style={styles.qualityBadge}>
@@ -471,7 +500,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
                                 style={styles.reloadButton}
                                 onPress={handleRefresh}
                             >
-                                <Icon name="refresh" size={24} color="#FFF" />
+                                <Icon name="refresh" size={20} color="#FFF" />
                                 <Text style={styles.reloadText}>Muat Ulang</Text>
                             </TouchableOpacity>
                         </View>

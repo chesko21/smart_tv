@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
     View,
     Text,
@@ -10,27 +10,30 @@ import {
     TouchableOpacity,
     Alert,
     Animated,
-    Dimensions,
-    Platform,
-    StatusBar
+    StatusBar,
+    RefreshControl,
 } from "react-native";
 import Modal from "react-native-modal";
 import Icon from "react-native-vector-icons/FontAwesome";
-import useM3uParse from "../../hooks/M3uParse";
-import { Camera, CameraType, CameraView } from 'expo-camera';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Camera, CameraView } from "expo-camera";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import useM3uParse from "../../hooks/M3uParse";
+import { useFocusEffect } from '@react-navigation/native';
+
 
 const EditUrl = () => {
     const {
         userUrls,
-        addUrl,
-        deleteUrl,
+        addUrl: useM3uAddUrl,
+        deleteUrl: useM3uDeleteUrl,
         defaultUrls,
-        toggleDefaultUrl,
         refetch,
         loading,
         error,
+        loadActiveUrl,
+        saveActiveUrl: useM3uSaveActiveUrl,
     } = useM3uParse();
 
     const [newUrl, setNewUrl] = useState("");
@@ -41,30 +44,66 @@ const EditUrl = () => {
     const [isScannerVisible, setScannerVisible] = useState(false);
     const [hasPermission, setHasPermission] = useState(null);
     const [scanned, setScanned] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
     const insets = useSafeAreaInsets();
     const [fadeAnim] = useState(new Animated.Value(0));
-    const windowWidth = Dimensions.get('window').width;
     const navigation = useNavigation();
 
-    useEffect(() => {
-        setIsProcessing(loading);
-        const activeDefault = defaultUrls.find((item) => item.enabled);
-        if (activeDefault) {
-            setActiveUrl(activeDefault.url);
-        } else if (userUrls.length > 0) {
-            setActiveUrl(userUrls[0]);
-        }
-    }, [loading, defaultUrls, userUrls]);
-
+    // Request camera permissions
     useEffect(() => {
         const getCameraPermissions = async () => {
-          const { status } = await Camera.requestCameraPermissionsAsync();
-          setHasPermission(status === "granted");
+            const { status } = await Camera.requestCameraPermissionsAsync();
+            setHasPermission(status === "granted");
         };
-    
         getCameraPermissions();
-      }, []);
+    }, []);
 
+    useFocusEffect(
+        useCallback(() => {
+            refetch(); 
+        }, [refetch])
+    );
+
+    useEffect(() => {
+        const loadActive = async () => {
+            try {
+                const active = await loadActiveUrl();
+                console.log(`Loaded Active URL: ${active}`);
+
+                if (active && isValidUrl(active)) {
+                    setActiveUrl(active);
+                    refetch();
+                } else {
+                  
+                    const defaultActive = defaultUrls.find(url => url.enabled)?.url;
+
+                    if (defaultActive) {
+                        setActiveUrl(defaultActive);
+                        await useM3uSaveActiveUrl(defaultActive);
+                        refetch();
+                    }
+                }
+            } catch (error) {
+                console.error("Failed to load active URL:", error);
+            }
+        };
+        loadActive();
+    }, [loadActiveUrl, refetch, defaultUrls]);
+
+    // Auto-save activeUrl to AsyncStorage whenever it changes
+    useEffect(() => {
+        const saveActiveToStorage = async () => {
+            try {
+                await AsyncStorage.setItem("active_m3u_url", activeUrl);
+            } catch (error) {
+                console.error("Failed to save active URL:", error);
+            }
+        };
+
+        if (activeUrl) saveActiveToStorage();
+    }, [activeUrl]);
+
+    // Fade-in animation effect
     useEffect(() => {
         Animated.timing(fadeAnim, {
             toValue: 1,
@@ -73,67 +112,86 @@ const EditUrl = () => {
         }).start();
     }, []);
 
-    const isValidUrl = (url) => {
-        const urlPattern = /^(https?:\/\/)[\w\-_]+(\.[\w\-_]+)+([\w\-\.,@?^=%&:/~+#]*[\w\-\@?^=%&/~+#])?$/;
+    // Interval to refetch data every 3 hours
+    useEffect(() => {
+        const intervalId = setInterval(refetch, 10800000);
+        return () => clearInterval(intervalId);
+    }, [refetch]);
+
+    // Validate URL format
+    const isValidUrl = (url: string) => {
+        const urlPattern = /^(https?:\/\/)[\w\-]+(\.[\w\-]+)+([\w\-\.,@?^=%&:/~+#]*[\w\-\@?^=%&/~+#])?$/;
         return urlPattern.test(url);
     };
 
-    const handleAddUrl = async () => {
+    // Save new URL to AsyncStorage
+    const addUrl = async (url: string) => {
+        try {
+            const updatedUrls = [...userUrls, url];
+            setNewUrl("");
+            await AsyncStorage.setItem("user_m3u_urls", JSON.stringify(updatedUrls));
+            await useM3uAddUrl(url);
+        } catch (error) {
+            console.error("Failed to save URL:", error);
+        }
+    };
+
+    // Remove URL from AsyncStorage
+    const deleteUrl = async (url: null) => {
+        try {
+            const updatedUrls = userUrls.filter((item) => item !== url);
+            await AsyncStorage.setItem("user_m3u_urls", JSON.stringify(updatedUrls));
+            await useM3uDeleteUrl(url);
+        } catch (error) {
+            console.error("Failed to delete URL:", error);
+        }
+    };
+
+    // Handle adding URL with validation
+    const handleAddUrl = useCallback(async () => {
         const trimmedUrl = newUrl.trim();
         if (!isValidUrl(trimmedUrl)) {
-            Alert.alert("URL Tidak Valid", "Silakan masukkan URL yang benar.");
+            Alert.alert("Invalid URL", "Please enter a valid URL.");
             return;
         }
-        if (userUrls.includes(trimmedUrl) || defaultUrls.some((item) => item.url === trimmedUrl)) {
-            Alert.alert("URL Sudah Ada", "URL ini sudah ada dalam daftar.");
+        if (userUrls.includes(trimmedUrl)) {
+            Alert.alert("Duplicate URL", "This URL already exists in the list.");
             return;
         }
         setIsProcessing(true);
         await addUrl(trimmedUrl);
-        setNewUrl(""); 
         setIsProcessing(false);
-    };
+    }, [newUrl, userUrls, addUrl]);
 
-    const handleDeleteUrl = (url) => {
+    const handleDeleteUrl = useCallback((url: React.SetStateAction<null>) => {
         setSelectedUrl(url);
         setModalVisible(true);
-    };
+    }, []);
 
-    const confirmDelete = async () => {
+    const confirmDelete = useCallback(async () => {
         setIsProcessing(true);
         await deleteUrl(selectedUrl);
         setIsProcessing(false);
         setModalVisible(false);
+    }, [selectedUrl, deleteUrl]);
+
+    const handleToggleUrl = useCallback(async (url: React.SetStateAction<string>) => {
+        if (url !== activeUrl) {
+            setIsProcessing(true);
+            setActiveUrl(url);
+            refetch();
+            setIsProcessing(false);
+        }
+    }, [activeUrl, refetch]);
+
+    // Handle pull-to-refresh functionality
+    const onRefresh = async () => {
+        setRefreshing(true);
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        setRefreshing(false);
     };
 
-    const handleToggleUrl = async (url) => {
-        if (url === activeUrl) {
-            return;
-        }
-        setIsProcessing(true);
-        setActiveUrl(url);
-        if (defaultUrls.some((item) => item.url === url)) {
-            await toggleDefaultUrl(url);
-        }
-        await refetch();
-        setIsProcessing(false);
-    };
-
-    const combinedUrls = [
-        ...defaultUrls.map((item, index) => ({
-            ...item,
-            name: `smart_tv ${index + 1}`,
-            enabled: item.url === activeUrl,
-            isUser: false,
-        })),
-        ...userUrls.map((url) => ({
-            url,
-            name: `🔒 ${url.substring(0, 15)}...`,
-            enabled: url === activeUrl,
-            isUser: true,
-        })),
-    ];
-
+    // Handle barcode scanning result
     const handleBarcodeScanned = ({ data }) => {
         setScanned(true);
         if (isValidUrl(data)) {
@@ -141,28 +199,38 @@ const EditUrl = () => {
             setScannerVisible(false);
             handleAddUrl();
         } else {
-            Alert.alert("URL Tidak Valid", "QR code tidak mengandung URL yang valid");
+            Alert.alert("Invalid URL", "The QR code does not contain a valid URL.");
         }
     };
 
+    const combinedUrls = useMemo(() => {
+        return [
+            ...defaultUrls.map((item: { url: string }, index: number) => ({
+                ...item,
+                name: `smart_tv ${index + 1}`,
+                enabled: item.url === activeUrl,
+                isUser: false,
+            })),
+            ...userUrls.map((url: string) => ({
+                url,
+                name: `🔒 ${url.substring(0, 15)}...`,
+                enabled: url === activeUrl,
+                isUser: true,
+            })),
+        ];
+    }, [defaultUrls, userUrls, activeUrl]);
+
     return (
-        <Animated.View style={[
-            styles.container,
-            { opacity: fadeAnim, paddingTop: insets.top }
-        ]}>
+        <Animated.View style={[styles.container, { opacity: fadeAnim, paddingTop: insets.top }]}>
             <StatusBar barStyle="dark-content" />
-            
             <View style={styles.header}>
-                <TouchableOpacity 
-                    style={styles.backButton}
-                    onPress={() => navigation.goBack()}
-                >
-                    <Icon name="arrow-left" size={24} color="#333" />
+                <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} accessibilityLabel="Back">
+                    <Icon name="arrow-left" size={16} color="#333" />
                 </TouchableOpacity>
-                <Text style={styles.title}>Kelola URL M3U</Text>
+                <Text style={styles.title}>Manage M3U URLs</Text>
                 <View style={styles.headerRight} />
             </View>
-            
+
             {error && <Text style={styles.errorText}>Error: {error}</Text>}
 
             <View style={styles.inputContainer}>
@@ -170,41 +238,44 @@ const EditUrl = () => {
                     <Icon name="link" size={20} color="#666" style={styles.inputIcon} />
                     <TextInput
                         style={styles.input}
-                        placeholder="Masukkan URL M3U"
+                        placeholder="Enter M3U URL"
                         placeholderTextColor="#999"
                         value={newUrl}
                         onChangeText={setNewUrl}
                         autoCapitalize="none"
                         autoCorrect={false}
+                        accessibilityLabel="M3U URL input"
                     />
                 </View>
-                
+
                 <TouchableOpacity
                     style={[
                         styles.actionButton,
                         styles.addButton,
-                        (!isValidUrl(newUrl) || isProcessing) && styles.disabledButton
+                        (!isValidUrl(newUrl) || isProcessing) && styles.disabledButton,
                     ]}
                     onPress={handleAddUrl}
                     disabled={!isValidUrl(newUrl) || isProcessing}
+                    accessibilityLabel="Add URL"
                 >
                     {isProcessing ? (
                         <ActivityIndicator color="#FFF" size="small" />
                     ) : (
-                        <Icon name="plus" size={20} color="white" />
+                        <Icon name="plus" size={16} color="white" />
                     )}
                 </TouchableOpacity>
 
-                <TouchableOpacity 
+                <TouchableOpacity
                     style={[styles.actionButton, styles.scanButton]}
                     onPress={() => setScannerVisible(true)}
+                    accessibilityLabel="Scan QR Code"
                 >
-                    <Icon name="qrcode" size={20} color="white" />
+                    <Icon name="qrcode" size={16} color="white" />
                 </TouchableOpacity>
             </View>
 
             {!isValidUrl(newUrl) && newUrl.length > 0 && (
-                <Text style={styles.errorText}>URL tidak valid! Gunakan format yang benar.</Text>
+                <Text style={styles.errorText}>Invalid URL! Please use the correct format.</Text>
             )}
 
             {loading && <ActivityIndicator size="large" color="#0000ff" />}
@@ -214,24 +285,14 @@ const EditUrl = () => {
                 keyExtractor={(item) => item.url}
                 contentContainerStyle={styles.listContainer}
                 renderItem={({ item }) => (
-                    <Animated.View 
-                        style={[styles.listItem, { transform: [{ scale: fadeAnim }] }]}
-                    >
+                    <Animated.View style={[styles.listItem, { transform: [{ scale: fadeAnim }] }]}>
                         <View style={styles.urlInfoContainer}>
-                            <Icon 
-                                name={item.isUser ? "lock" : "globe"} 
-                                size={16} 
-                                color={item.enabled ? "#4CAF50" : "#757575"}
-                                style={styles.urlIcon}
-                            />
-                            <Text style={[
-                                styles.urlText,
-                                item.enabled && styles.activeUrlText
-                            ]}>
+                            <Icon name={item.isUser ? "lock" : "globe"} size={15} color={item.enabled ? "#4CAF50" : "#757575"} style={styles.urlIcon} />
+                            <Text style={[styles.urlText, item.enabled && styles.activeUrlText]}>
                                 {item.name}
                             </Text>
                         </View>
-                        
+
                         <View style={styles.actionContainer}>
                             <Switch
                                 value={item.enabled}
@@ -240,19 +301,22 @@ const EditUrl = () => {
                                 trackColor={{ false: "#ddd", true: "#4CAF50" }}
                                 thumbColor={item.enabled ? "#000" : "#FF5733"}
                             />
-                            
                             {item.isUser && (
-                                <TouchableOpacity 
+                                <TouchableOpacity
                                     onPress={() => handleDeleteUrl(item.url)}
                                     style={styles.deleteButton}
                                     disabled={isProcessing}
+                                    accessibilityLabel="Delete URL"
                                 >
-                                    <Icon name="trash" size={20} color="#FF5733" />
+                                    <Icon name="trash" size={15} color="#FF5733" />
                                 </TouchableOpacity>
                             )}
                         </View>
                     </Animated.View>
                 )}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                }
             />
 
             <Modal 
@@ -263,15 +327,15 @@ const EditUrl = () => {
                 backdropTransitionOutTiming={0}
             >
                 <View style={styles.modalContainer}>
-                    <Icon name="exclamation-circle" size={40} color="#FF5733" />
-                    <Text style={styles.modalTitle}>Hapus URL?</Text>
-                    <Text style={styles.modalMessage}>Apakah Anda yakin ingin menghapus URL ini?</Text>
+                    <Icon name="exclamation-circle" size={20} color="#FF5733" />
+                    <Text style={styles.modalTitle}>Delete URL?</Text>
+                    <Text style={styles.modalMessage}>Are you sure you want to delete this URL?</Text>
                     <View style={styles.modalButtons}>
                         <TouchableOpacity style={[styles.modalButton, styles.cancelButton]} onPress={() => setModalVisible(false)}>
-                            <Text style={styles.buttonText}>Batal</Text>
+                            <Text style={styles.buttonText}>Cancel</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={[styles.modalButton, styles.confirmButton]} onPress={confirmDelete}>
-                            <Text style={styles.buttonText}>Hapus</Text>
+                            <Text style={styles.buttonText}>Delete</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -281,9 +345,9 @@ const EditUrl = () => {
             <Modal isVisible={isScannerVisible} onBackdropPress={() => setScannerVisible(false)}>
                 <View style={styles.scannerContainer}>
                     {hasPermission === null ? (
-                        <Text style={styles.scannerText}>Meminta izin kamera...</Text>
+                        <Text style={styles.scannerText}>Requesting camera permissions...</Text>
                     ) : hasPermission === false ? (
-                        <Text style={styles.scannerText}>Tidak ada akses ke kamera</Text>
+                        <Text style={styles.scannerText}>No access to camera</Text>
                     ) : (
                         <CameraView
                             style={StyleSheet.absoluteFillObject}
@@ -300,14 +364,15 @@ const EditUrl = () => {
                         }}
                         style={styles.closeButton}
                     >
-                        <Icon name="times" size={24} color="white" />
+                        <Icon name="times" size={15} color="white" />
                     </TouchableOpacity>
+
                     {scanned && (
                         <TouchableOpacity
                             style={styles.rescanButton}
                             onPress={() => setScanned(false)}
                         >
-                            <Icon name="refresh" size={24} color="white" />
+                            <Icon name="refresh" size={15} color="white" />
                         </TouchableOpacity>
                     )}
                 </View>
@@ -331,7 +396,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         marginBottom: 20,
         alignItems: "center",
-        
     },
     inputWrapper: {
         flex: 1,
@@ -341,17 +405,6 @@ const styles = StyleSheet.create({
         marginRight: 10,
         paddingHorizontal: 12,
         backgroundColor: "#Ff3",
-        ...Platform.select({
-            ios: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.1,
-                shadowRadius: 4,
-            },
-            android: {
-                elevation: 4,
-            },
-        }),
     },
     inputIcon: {
         marginRight: 8,
@@ -368,17 +421,6 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
-        ...Platform.select({
-            ios: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.2,
-                shadowRadius: 4,
-            },
-            android: {
-                elevation: 4,
-            },
-        }),
     },
     addButton: {
         backgroundColor: "#4CAF50",
@@ -398,17 +440,6 @@ const styles = StyleSheet.create({
         padding: 16,
         borderRadius: 12,
         backgroundColor: "#Ff3",
-        ...Platform.select({
-            ios: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.1,
-                shadowRadius: 4,
-            },
-            android: {
-                elevation: 2,
-            },
-        }),
     },
     urlInfoContainer: {
         flex: 1,
@@ -524,20 +555,9 @@ const styles = StyleSheet.create({
         padding: 8,
         borderRadius: 20,
         backgroundColor: 'rgba(255,255,255,0.9)',
-        ...Platform.select({
-            ios: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.2,
-                shadowRadius: 4,
-            },
-            android: {
-                elevation: 4,
-            },
-        }),
     },
     headerRight: {
-        width: 40, // Balance layout with back button
+        width: 40,
     },
 });
 

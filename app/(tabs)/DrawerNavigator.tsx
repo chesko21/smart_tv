@@ -1,24 +1,28 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { createDrawerNavigator } from "@react-navigation/drawer";
 import { Ionicons } from "@expo/vector-icons";
 import HomeScreen from "./HomeScreen";
 import VodScreen from "./VodScreen";
 import LiveTvScreen from "./LiveTvScreen";
 import PlayerScreen from "./PlayerScreen";
-import PlaylistScreen from "./EditUrl";
-import SearchScreen from "./SearchScreen"; 
+import useM3uParse from '../../hooks/M3uParse'; 
+
 import Colors from "../../constants/Colors";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { StyleSheet, View, Text, Image, TouchableOpacity, SafeAreaView, BackHandler } from 'react-native';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, CommonActions } from '@react-navigation/native';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { EventEmitter } from 'events';
+
 export const userUpdateEmitter = new EventEmitter();
 
 const Drawer = createDrawerNavigator();
 const Tab = createBottomTabNavigator();
 
 const ProfileScreen = React.lazy(() => import('./ProfileScreen'));
+const EditUrl = React.lazy(() => import('./EditUrl'));
+const SearchScreen = React.lazy(() => import('./SearchScreen'));
+const EditEpg = React.lazy(() => import('./EditEpg'));
 
 function HomeTabs() {
   return (
@@ -90,7 +94,7 @@ function HomeTabs() {
         }}
       />
       <Tab.Screen
-        name="Profile"
+        name="ProfileScreen"
         component={ProfileScreen}
         options={{
           title: "Profile",
@@ -104,6 +108,28 @@ function HomeTabs() {
 }
 
 function DrawerNavigator() {
+  const {
+    refetch,
+    loadActiveUrl,
+  } = useM3uParse();
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const activeUrl = await loadActiveUrl();
+        if (activeUrl) {
+          await refetch(); 
+        } else {
+          console.log("No active URL found.");
+        }
+      } catch (error) {
+        console.error("Failed to load active URL:", error);
+      }
+    };
+
+    fetchData();
+  }, [loadActiveUrl, refetch]);
+
   return (
     <Drawer.Navigator
       screenOptions={{
@@ -129,16 +155,25 @@ function DrawerNavigator() {
         name="Home"
         component={HomeTabs}
         options={{
-          drawerIcon: ({ color, size }) => (
+          drawerIcon: ({ color }) => (
             <Ionicons name="home" size={22} color={color || Colors.primary} />
           ),
         }}
       />
       <Drawer.Screen
-        name="Playlist"
-        component={PlaylistScreen}
+        name="EditUrl"
+        component={EditUrl}
         options={{
-          drawerIcon: ({ color, size }) => (
+          drawerIcon: ({ color }) => (
+            <Ionicons name="unlink" size={22} color={color || Colors.primary} />
+          ),
+        }}
+      />
+      <Drawer.Screen
+        name="EditEpg"
+        component={EditEpg}
+        options={{
+          drawerIcon: ({ color }) => (
             <Ionicons name="list" size={22} color={color || Colors.primary} />
           ),
         }}
@@ -147,12 +182,10 @@ function DrawerNavigator() {
   );
 }
 
-function CustomDrawerContent(props) {
+const CustomDrawerContent = React.memo((props) => {
   const { navigation } = props;
   const [user, setUser] = useState({ username: 'Guest', avatar: null });
   const [avatarError, setAvatarError] = useState(false);
-  const navigationProfile = useNavigation();
-  const [updateTrigger, setUpdateTrigger] = useState(0);
 
   useFocusEffect(
     useCallback(() => {
@@ -169,10 +202,8 @@ function CustomDrawerContent(props) {
         }
       };
 
-      // Add event listener for user updates
       const handleUserUpdate = () => {
         loadUserData();
-        setUpdateTrigger(prev => prev + 1);
       };
 
       userUpdateEmitter.on('userUpdate', handleUserUpdate);
@@ -181,7 +212,7 @@ function CustomDrawerContent(props) {
       return () => {
         userUpdateEmitter.removeListener('userUpdate', handleUserUpdate);
       };
-    }, [updateTrigger])
+    }, [])
   );
 
   const handleAvatarError = () => {
@@ -190,6 +221,20 @@ function CustomDrawerContent(props) {
 
   const handleExitApp = () => {
     BackHandler.exitApp();
+  };
+
+  const handleNavigation = (routeName: string) => {
+    if (routeName === 'Home') {
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: 'Home' }],
+        })
+      );
+    } else {
+      navigation.navigate(routeName);
+    }
+    navigation.closeDrawer();
   };
 
   const defaultAvatar = require("../../assets/images/ic_launcher.png");
@@ -206,14 +251,11 @@ function CustomDrawerContent(props) {
         <Text style={styles.drawerUsername}>{user.username}</Text>
       </View>
       <View style={styles.drawerContent}>
-        {props.state.routes.map((route, index) => (
+        {props.state.routes.map((route: { key: React.Key | null | undefined; name: string; }) => (
           <TouchableOpacity
             key={route.key}
             style={styles.drawerItem}
-            onPress={() => {
-              navigation.navigate(route.name);
-              navigation.closeDrawer();
-            }}
+            onPress={() => handleNavigation(route.name)}
           >
             <View style={styles.drawerItemContent}>
               <Ionicons
@@ -233,8 +275,9 @@ function CustomDrawerContent(props) {
       </TouchableOpacity>
     </SafeAreaView>
   );
-}
+});
 
+// Styles for the DrawerNavigator
 const styles = StyleSheet.create({
   drawerContainer: {
     flex: 1,

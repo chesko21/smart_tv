@@ -84,13 +84,13 @@ const LiveTV = () => {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      refetch();
+        await refetch(); 
     } catch (error) {
-      console.error("Error refreshing:", error);
+        console.error("Error refreshing:", error);
     } finally {
-      setRefreshing(false);
+        setRefreshing(false);
     }
-  }, [refetch]);
+}, [refetch]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -121,21 +121,21 @@ const LiveTV = () => {
           </TouchableOpacity>
 
           <FlatList
-            key={`channels-${selectedGroup}`}
-            data={filteredChannels}
-            numColumns={3}
-            keyExtractor={(item) => item.url}
-            contentContainerStyle={styles.channelList}
-            renderItem={renderChannelItem}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={onRefresh}
-                colors={[Colors.primary]}
-                tintColor={Colors.primary}
-              />
-            }
-          />
+    key={`channels-${selectedGroup}`}
+    data={filteredChannels}
+    numColumns={3}
+    keyExtractor={(item) => item.url}
+    contentContainerStyle={styles.channelList}
+    renderItem={renderChannelItem}
+    refreshControl={
+        <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh} 
+            colors={[Colors.primary]}
+            tintColor={Colors.primary}
+        />
+    }
+/>
         </>
       ) : (
         <>

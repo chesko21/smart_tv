@@ -27,6 +27,16 @@ interface ChannelListProps {
   onChannelSelect?: (channel: Channel) => void;
 }
 
+// Shuffle function to randomize channel order
+const shuffleArray = (array: Channel[]) => {
+  const shuffledArray = [...array];
+  for (let i = shuffledArray.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffledArray[i], shuffledArray[j]] = [shuffledArray[j], shuffledArray[i]];
+  }
+  return shuffledArray;
+}
+
 const ChannelLogo = React.memo(({ logo, channelName }: { logo: string | null, channelName: string }) => {
   const [hasError, setHasError] = useState(false);
   const defaultImage = require("../assets/images/maskable.png");
@@ -95,8 +105,16 @@ const ChannelList: React.FC<ChannelListProps> = ({
   const { isInPipMode, exitPip } = usePip();
 
   useEffect(() => {
-    const filteredChannels = channels.filter(channel => channel.url !== currentChannelUrl);
-    setRecommendedChannels(filteredChannels.slice(0, 10));
+    // Find the current channel
+    const currentChannel = channels.find(channel => channel.url === currentChannelUrl);
+    if (currentChannel && currentChannel.group) {
+      // Filter channels that belong to the same group as the current channel
+      const filteredChannels = channels.filter(channel => channel.group === currentChannel.group && channel.url !== currentChannelUrl);
+      const shuffledChannels = shuffleArray(filteredChannels).slice(0, 10); // Shuffle and take only the first 10
+      setRecommendedChannels(shuffledChannels);
+    } else {
+      setRecommendedChannels([]); // Clear recommendations if no valid channel is found
+    }
   }, [currentChannelUrl, channels]);
 
   const handleChannelChange = useCallback((channelUrl: string) => {
@@ -139,7 +157,6 @@ const ChannelList: React.FC<ChannelListProps> = ({
           renderItem={renderItem}
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.contentContainer}
-          exitPip={exitPip}
         />
       ) : (
         <Text style={styles.noRecommendationText}>No recommendations available</Text>

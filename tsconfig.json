@@ -12,13 +12,11 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "paths": {
-      "@/*": [
-        "./*"
-      ]
-    }
+      "*": ["./*"]
+    },
+    "module": "esnext"
   },
   "exclude": ["node_modules", "babel.config.js", "metro.config.js"],
-  
   "include": [
     "**/*.ts",
     "**/*.tsx",
@@ -26,9 +24,7 @@
     "app/**/*.tsx",
     "types.d.ts",
     "global.d.ts",
-    "expo-env.d.ts",         
+    "expo-env.d.ts",
     ".expo/types/**/*.ts"
   ]
-
-
 }

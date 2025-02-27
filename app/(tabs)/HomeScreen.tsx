@@ -84,7 +84,7 @@ export default function Home() {
 
   const filteredSports = useMemo(() => {
     const sportsKeywords = ["sport", "sports", "olahraga", "bola", "liga", "UCL", "league", 
-      "champions", "cup", "ufc", "timnas" , "Volly" , "voli" , "basket", "pptv",
+      "champions", "cup", "ufc", "timnas" , "Volly" , "voli" , "basket", "pptv" ,"SPOTV",
 
     ];
     return channels.filter((channel) =>
@@ -93,7 +93,7 @@ export default function Home() {
   }, [channels]);
 
   const filteredRadio = useMemo(() => {
-    const radioKeywords = ["radio", "radio indonesia", "pinoy radio", "malay radio", "rri radio"];
+    const radioKeywords = ["radio", "radio indonesia", "pinoy radio", "malay radio", "rri radio" , "musik" , "music"];
     return channels.filter((channel) =>
       radioKeywords.some((keyword) => channel.group?.toLowerCase()?.includes(keyword))
     );
