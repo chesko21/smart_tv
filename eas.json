@@ -15,8 +15,7 @@
     "production": {
       "autoIncrement": true,
       "android": {
-        "gradleCommand": ":app:assembleRelease",
-        "image": "ubuntu-20.04"
+        "gradleCommand": ":app:assembleRelease"
       }
     }
   }
