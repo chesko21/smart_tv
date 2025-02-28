@@ -1,6 +1,6 @@
 {
   "cli": {
-    "version": ">= 15.0.2",
+    "version": ">= 15.0.10",
     "appVersionSource": "remote"
   },
   "build": {
@@ -12,14 +12,7 @@
       "distribution": "internal"
     },
     "production": {
-      "autoIncrement": true,
-      "android": {
-        "gradleCommand": ":app:assembleRelease",
-        "image": "default"
-      },
-      "ios": {
-        "image": "latest"
-      }
+      "autoIncrement": true
     }
   },
   "submit": {
