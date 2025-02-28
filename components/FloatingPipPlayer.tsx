@@ -1,117 +1,131 @@
-import React, { useRef, useState } from 'react';
-import { View, StyleSheet, Animated, PanResponder, Dimensions, TouchableOpacity } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, StyleSheet, Dimensions, PanResponder, TouchableOpacity, Text } from 'react-native';
 import VideoPlayer from './VideoPlayer';
 import { usePip } from '../contexts/PipContext';
+import Icon from "@expo/vector-icons/MaterialIcons"; // Importing Material Icons
+
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const FloatingPipPlayer = () => {
   const { isInPipMode, pipUrl, pipChannel, setPipMode } = usePip();
-  const [pipPosition, setPipPosition] = useState({ x: SCREEN_WIDTH - 200, y: SCREEN_HEIGHT - 150 }); // Default position
-  const draggedPosition = useRef(new Animated.ValueXY(pipPosition)).current;
+  const [pipPosition, setPipPosition] = useState({ x: SCREEN_WIDTH - 220, y: SCREEN_HEIGHT - 180 }); // Adjusted for padding
+  const isDragging = useRef(false);
 
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: () => {
-        draggedPosition.setOffset({ x: pipPosition.x, y: pipPosition.y });
-        draggedPosition.setValue({ x: 0, y: 0 });
+        isDragging.current = true;
       },
-      onPanResponderMove: Animated.event(
-        [
-          null,
-          { dx: draggedPosition.x, dy: draggedPosition.y }
-        ],
-        { useNativeDriver: false }
-      ),
-      onPanResponderRelease: (_, gestureState) => {
-        const newX = Math.min(
-          Math.max(draggedPosition.x._offset + gestureState.dx, 0),
-          SCREEN_WIDTH - 200 // Keep it within screen bounds
-        );
-        const newY = Math.min(
-          Math.max(draggedPosition.y._offset + gestureState.dy, 0),
-          SCREEN_HEIGHT - 150 // Keep it within screen bounds
-        );
-
-        setPipPosition({ x: newX, y: newY });
-        draggedPosition.setOffset({ x: newX, y: newY });
-        draggedPosition.setValue({ x: 0, y: 0 });
+      onPanResponderMove: (event, gestureState) => {
+        if (isDragging.current) {
+          const newX = Math.min(
+            Math.max(pipPosition.x + gestureState.dx, 0),
+            SCREEN_WIDTH - 200 
+          );
+          const newY = Math.min(
+            Math.max(pipPosition.y + gestureState.dy, 0),
+            SCREEN_HEIGHT - 160 
+          );
+          setPipPosition({ x: newX, y: newY });
+        }
+      },
+      onPanResponderRelease: () => {
+        isDragging.current = false;
       },
     })
   ).current;
 
-  const handlePipModeChange = (isInPip: boolean) => {
-    setPipMode(isInPip);
-  };
-
   const handlePress = () => {
-    setPipMode(false); 
+    setPipMode(false);
   };
 
-  // New default implementations for onLoadStart, onLoad, and onErrorts
-  const handleLoadStart = () => {
-    console.log('Load started');
-  };
-  
-  const handleLoad = () => {
-    console.log('Load completed');
-  };
-  
-  const handleError = () => {
-    console.log('Error occurred');
-  };
+  const handleLoadStart = () => console.log('Load started');
+  const handleLoad = () => console.log('Load completed');
+  const handleError = () => console.log('Error occurred');
 
   if (!isInPipMode || !pipUrl) return null;
 
   return (
-    <Animated.View
+    <View
       {...panResponder.panHandlers}
       style={[
         styles.pipContainer,
         {
-          transform: [
-            { translateX: draggedPosition.x },
-            { translateY: draggedPosition.y },
-          ],
+          left: pipPosition.x,
+          top: pipPosition.y,
         },
       ]}
     >
-      <TouchableOpacity onPress={handlePress} style={styles.pipVideoContainer}>
+      <TouchableOpacity style={styles.pipVideoContainer}>
         <VideoPlayer
           url={pipUrl}
           channel={pipChannel}
           paused={false}
-          style={styles.pipVideoContainer}
+          style={styles.videoCentered}
           onLoadStart={handleLoadStart}
           onLoad={handleLoad}
           onError={handleError}
-          onPipModeChange={handlePipModeChange}
         />
+
+        <View style={styles.overlay}>
+          <Text style={styles.channelText}>
+            {pipChannel?.name || "Live Channel"} 
+          </Text>
+          <TouchableOpacity style={styles.closeButton} onPress={handlePress}>
+            <Icon name="close" size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
       </TouchableOpacity>
-    </Animated.View>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   pipContainer: {
     position: 'absolute',
-    width: 180,
-    height: 120,
-    zIndex: 999999,
+    width: 200,
+    height: 180, 
     backgroundColor: '#000',
-    borderRadius: 8,
-    borderColor: "#fff",
+    borderRadius: 4,
+    borderColor: '#fff',
     borderWidth: 2,
     elevation: 5,
     shadowOpacity: 0.3,
+    zIndex: 999999,
+    overflow: 'hidden',
   },
   pipVideoContainer: {
+    flex: 1,
+    borderRadius: 4,
+    overflow: 'hidden',
+    position: 'relative', 
+  },
+  videoCentered: {
     width: '100%',
     height: '100%',
-    borderRadius: 8,
-    overflow: 'hidden',
+    alignItems: 'center', 
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 10,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)', 
+    padding: 4,
+  },
+  channelText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  closeButton: {
+    padding: 4,
   },
 });
 

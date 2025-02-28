@@ -5,9 +5,10 @@ import type {
     DRMType as VideoDRMType,
     OnLoadData,
     OnBufferData,
-    OnError,
+    OnError as OnErrorData,
     OnPictureInPictureStatusChangedData
 } from "react-native-video";
+
 
 import { urlChangeEmitter } from "../utils/events";
 
@@ -29,7 +30,8 @@ import {
 import Video from "react-native-video";
 import Toast from "react-native-toast-message";
 import { Buffer } from "buffer";
-import Icon from "react-native-vector-icons/MaterialIcons";
+import Icon from "@expo/vector-icons/MaterialIcons"; // Updated import for Material Icons
+
 import { Channel } from "@/hooks/M3uParse";
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -203,7 +205,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
         onLoad?.();
     };
 
-    const handleError = (e: OnErrorData) => {
+const handleError = (e: OnError) => {
+
 
         const errorMessage = e.error?.errorString || e.error?.error || "An error occurred.";
         setLoading(false);
@@ -325,7 +328,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }, []);
 
 
-    const handlePipModeChange = (event: OnPictureInPictureStatusChangedData) => {
+const handlePipModeChange = (event: { isInPictureInPictureMode: boolean }) => {
+
 
         setIsInPipMode(event.isInPictureInPictureMode);
         setIsPlaying(!event.isInPictureInPictureMode);
@@ -535,26 +539,28 @@ const styles = StyleSheet.create({
     scrollViewContent: {
         flexGrow: 1,
     },
-    videoContainer: {
-        position: "relative",
-        backgroundColor: "#000",
-    },
     touchableArea: {
-        flex: 1,
         width: "100%",
         height: "100%",
     },
     video: {
         width: "100%",
         height: "100%",
-        flex: 1,
         backgroundColor: '#000',
     },
+    videoContainer: {
+        width: "100%",
+        height: "100%",
+        justifyContent: "center",
+        alignItems: "center",
+        position: "relative",
+        backgroundColor: "#000",
+    },
+
     container: {
         position: "relative",
         backgroundColor: "#000",
-        flex: 1,
-        width: "100%",
+      
     },
     overlay: {
         position: "absolute",
@@ -594,8 +600,8 @@ const styles = StyleSheet.create({
         color: '#FFF',
         fontSize: 12,
         fontWeight: 'bold',
-        paddingHorizontal: 8,
-        paddingVertical: 8,
+        paddingHorizontal: 4,
+        paddingVertical: 4,
         borderBottomWidth: 1,
         borderBottomColor: 'rgba(255,255,255,0.1)',
         justifyContent: "center",
@@ -642,6 +648,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         padding: 8,
         backgroundColor: 'rgba(0, 0, 0, 0.39)',
+        
     },
     rightControls: {
         flexDirection: 'row',
@@ -652,6 +659,7 @@ const styles = StyleSheet.create({
         padding: 4,
         backgroundColor: 'rgba(0,0,0,0.5)',
         borderRadius: 20,
+        gap: 5,
     },
     reloadButton: {
         flexDirection: 'row',

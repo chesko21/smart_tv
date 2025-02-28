@@ -14,11 +14,13 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-const baseWidth = 375; 
-const baseHeight = 812; 
+const baseWidth = Dimensions.get('window').width; 
+const baseHeight = Dimensions.get('window').height; 
 
-const scale = SCREEN_WIDTH / baseWidth;
+
+const scale = Math.min(SCREEN_WIDTH / baseWidth, SCREEN_HEIGHT / baseHeight);
 const moderateScale = (size: number, factor = 0.5) => size + (scale - 1) * factor;
+
 
 export default function Layout() {
     const [isOnline, setIsOnline] = useState(true);
@@ -118,8 +120,9 @@ const styles = StyleSheet.create({
         backgroundColor: "#000",
         justifyContent: "center",
         alignItems: "center",
-        padding: moderateScale(20),
+        padding: moderateScale(5),
     },
+
     lottieAnimation: {
         width: '50%',
         height: undefined,
@@ -137,9 +140,10 @@ const styles = StyleSheet.create({
         padding: moderateScale(10),
         backgroundColor: 'rgba(0, 0, 0, 0.7)',
         position: 'absolute',
-        top: Platform.OS === 'ios' ? moderateScale(50) : 0,
+        top: Platform.OS === 'ios' ? moderateScale(10) : 0,
         width: '100%',
     },
+
     icon: {
         marginRight: moderateScale(8),
     },

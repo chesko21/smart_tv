@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#000",
-    height: Dimensions.get("window").height * 0.4, 
+    height: Dimensions.get("window").height * 0.3, 
     width: "100%", 
   },
   placeholderText: {
@@ -257,7 +257,7 @@ const styles = StyleSheet.create({
   videoContainer: {
     alignContent: "center",
     width: "100%",
-    height: Dimensions.get("window").height * 0.4, 
+    height: Dimensions.get("window").height * 0.3, 
   },
   channelListWithUpcoming: {
     marginTop: 20,
