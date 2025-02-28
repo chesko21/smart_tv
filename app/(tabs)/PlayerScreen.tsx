@@ -56,11 +56,11 @@ const PlayerScreen = ({ route }) => {
   useEffect(() => {
     const handleBackPress = () => {
       if (isInPipMode) {
-        handlePipModeChange(false);
-        return true; 
+          handlePipModeChange(false);
+          return true; 
       }
       return false; 
-    };
+  };
     BackHandler.addEventListener("hardwareBackPress", handleBackPress);
     return () => {
       BackHandler.removeEventListener("hardwareBackPress", handleBackPress);
@@ -131,13 +131,13 @@ const PlayerScreen = ({ route }) => {
     }
   }, [refetch]);
 
-  const handlePipModeChange = useCallback((isInPipMode) => {
+  const handlePipModeChange = useCallback((isInPipMode: boolean | ((prevState: boolean) => boolean)) => {
     setIsInPipMode(isInPipMode);
     setPipMode(isInPipMode, url, selectedChannel);
     setIsPlaying(!isInPipMode);
   }, [url, selectedChannel, setPipMode]);
 
-  const saveWatchHistory = async (videoUrl, channelName) => {
+  const saveWatchHistory = async (videoUrl: any, channelName: string) => {
       try {
         const existingHistory = await AsyncStorage.getItem('watchHistory');
         const history = existingHistory ? JSON.parse(existingHistory) : [];
@@ -147,11 +147,10 @@ const PlayerScreen = ({ route }) => {
           timestamp: Date.now(),
           logo: selectedChannel?.tvgLogo || selectedChannel?.logo || "https://img.lovepik.com/png/20231108/cute-cartoon-water-drop-coloring-page-can-be-used-for_531960_wh860.png"
         };
-      // Put new entry at the beginning and keep only unique entries
+      
       const updatedHistory = [newEntry, ...history].filter((item, index, self) =>
         index === self.findIndex(t => t.url === item.url)
       );
-      // Keep only the latest 20 items
       const limitedHistory = updatedHistory.slice(0, 20);
       await AsyncStorage.setItem('watchHistory', JSON.stringify(limitedHistory));
       watchHistoryEvent.emit("historyUpdated");
@@ -159,8 +158,7 @@ const PlayerScreen = ({ route }) => {
       console.error("Failed to save watch history:", error);
     }
   };
-  // Add this new function to handle orientation changes
-  const handleFullscreenChange = useCallback(async (fullscreen) => {
+  const handleFullscreenChange = useCallback(async (fullscreen: boolean | ((prevState: boolean) => boolean)) => {
     setIsFullscreen(fullscreen);
     if (fullscreen) {
       await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE_RIGHT);
@@ -168,7 +166,6 @@ const PlayerScreen = ({ route }) => {
       await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
     }
   }, []);
-  // Add this effect to lock orientation when component mounts
   useEffect(() => {
     ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
     return () => {
@@ -193,7 +190,7 @@ const PlayerScreen = ({ route }) => {
                 channel={selectedChannel}
                 onError={handleError}
                 paused={!isPlaying}
-                style={{ height: "100%", width: "100%" }}
+               style={{ height: "100%", width: "100%" }}
                 onRefresh={handleRefresh}
                 onPipModeChange={handlePipModeChange}
                 isPipEnabled={true}
@@ -228,8 +225,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#121212",
-    justifyContent: "center",
-    alignItems: "center",
+    //justifyContent: "flex-start",
+    alignItems: "stretch",
   },
   scrollViewContent: {
     flexGrow: 1,
@@ -237,6 +234,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     flexDirection: "column",
+    flex: 1,
   },
   infoContainer: {
     marginTop: 10,
@@ -246,25 +244,28 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#000",
+    height: Dimensions.get("window").height * 0.4, 
+    width: "100%", 
   },
   placeholderText: {
     color: "#fff",
     fontSize: 16,
     textAlign: "center",
     paddingHorizontal: 20,
-    justifyContent: "center",
-    alignItems: "center",
+    paddingVertical: 10,
   },
   videoContainer: {
-    textAlign: "center",
+    alignContent: "center",
+    width: "100%",
+    height: Dimensions.get("window").height * 0.4, 
   },
   channelListWithUpcoming: {
     marginTop: 20,
-    paddingHorizontal: 2,
+    paddingHorizontal: 10, 
   },
   channelListWithoutUpcoming: {
     marginTop: 20,
-    paddingHorizontal: 2,
+    paddingHorizontal: 10, 
   },
 });
 

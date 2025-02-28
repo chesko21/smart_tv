@@ -26,6 +26,7 @@ export interface Channel {
 const DEFAULT_M3U_URLS = [
     { url: "https://pastebin.com/raw/JyCSD9r1", enabled: true },
     { url: "https://raw.githubusercontent.com/chesko21/tv-online-m3u/refs/heads/my-repo/testing.m3u", enabled: false },
+    { url: "https://raw.githubusercontent.com/chesko21/tv-online-m3u/refs/heads/my-repo/Tvku.m3u" , enabled: false },
 ];
 
 const CACHE_KEY = "m3u_channels_cache";

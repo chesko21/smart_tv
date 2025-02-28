@@ -61,7 +61,7 @@ const configureDrm = (channel: any): DrmConfig => {
     if (channel.license_type?.includes("clearkey") && channel.license_key) {
         const [kidHex, keyHex] = channel.license_key.split(":");
         if (!kidHex || !keyHex || kidHex.length !== 32 || keyHex.length !== 32) {
-           // console.error("Invalid KID or Key for ClearKey DRM.");
+            console.error("Invalid KID or Key for ClearKey DRM.");
             return {};
         }
         drmConfig.type = "clearkey" as DRMType;
@@ -84,7 +84,7 @@ const configureDrm = (channel: any): DrmConfig => {
         drmConfig.type = "playready" as DRMType;
         drmConfig.licenseServer = channel.license_key.trim();
     } else {
-        console.warn("No valid DRM configuration for the provided channel.");
+        //console.warn("No valid DRM configuration for the provided channel.");
     }
 
     return drmConfig;

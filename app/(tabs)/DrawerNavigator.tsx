@@ -5,7 +5,7 @@ import HomeScreen from "./HomeScreen";
 import VodScreen from "./VodScreen";
 import LiveTvScreen from "./LiveTvScreen";
 import PlayerScreen from "./PlayerScreen";
-import useM3uParse from '../../hooks/M3uParse'; 
+import useM3uParse from '../../hooks/M3uParse';
 
 import Colors from "../../constants/Colors";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
@@ -84,16 +84,6 @@ function HomeTabs() {
         }}
       />
       <Tab.Screen
-        name="SearchScreen"
-        component={SearchScreen}
-        options={{
-          title: "Search",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="search" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tab.Screen
         name="ProfileScreen"
         component={ProfileScreen}
         options={{
@@ -118,7 +108,7 @@ function DrawerNavigator() {
       try {
         const activeUrl = await loadActiveUrl();
         if (activeUrl) {
-          await refetch(); 
+          refetch();
         } else {
           console.log("No active URL found.");
         }
@@ -175,6 +165,16 @@ function DrawerNavigator() {
         options={{
           drawerIcon: ({ color }) => (
             <Ionicons name="list" size={22} color={color || Colors.primary} />
+          ),
+        }}
+      />
+      <Drawer.Screen
+        name="SearchScreen"
+        component={SearchScreen}
+        options={{
+          title: "Search",
+          drawerIcon: ({ color, size }) => (
+            <Ionicons name="search" size={22} color={color || Colors.primary} />
           ),
         }}
       />

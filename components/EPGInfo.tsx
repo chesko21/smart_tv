@@ -1,4 +1,4 @@
-// Importing necessary dependencies
+
 import React, { useEffect, useState, useCallback } from "react";
 import { ActivityIndicator } from "react-native";
 import { View, Text, StyleSheet, Animated, useWindowDimensions, Button } from "react-native";
@@ -9,7 +9,6 @@ import { LinearGradient } from "expo-linear-gradient";
 import axios from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 
-// Define types for programs and props
 interface Program {
   channel: string;
   start: string;
@@ -22,7 +21,6 @@ interface EPGInfoProps {
   channelName: string;
 }
 
-// Utility function to normalize TVG ID
 const normalizeTvgId = (id: string | null) => id?.trim() || '';
 
 const EPGInfo: React.FC<EPGInfoProps> = ({ tvgId, channelName }) => {
@@ -36,7 +34,6 @@ const EPGInfo: React.FC<EPGInfoProps> = ({ tvgId, channelName }) => {
   const { defaultEpgUrls } = useEPG(); 
   const fetchAndProcessEPG = useCallback(async () => {
         try {
-            // Clear all old EPG data chunks
             const oldChunkCount = parseInt(await AsyncStorage.getItem('epgChunkCount') || '0');
             for (let i = 0; i < oldChunkCount * 100; i += 100) {
                 await AsyncStorage.removeItem(`epgData_${i}`);
@@ -46,12 +43,11 @@ const EPGInfo: React.FC<EPGInfoProps> = ({ tvgId, channelName }) => {
             
             const storedUrls = await AsyncStorage.getItem('epgUrls');
             const epgUrls = storedUrls ? JSON.parse(storedUrls) : [];
-            // Remove duplicate URLs
+        
             const uniqueUrls = [...new Set([...defaultEpgUrls, ...epgUrls.filter((u: { active: any; }) => u.active).map((u: { url: any; }) => u.url)])];
             
             console.log('Processing EPG URLs:', uniqueUrls);
 
-            // Initialize channelsData object
             let channelsData: { [key: string]: { tvgId: string, programme: Program[] } } = {};
 
             for (const url of uniqueUrls) {
@@ -73,7 +69,6 @@ const EPGInfo: React.FC<EPGInfoProps> = ({ tvgId, channelName }) => {
                     const parsed = parser.parse(xmlData);
                     console.log(`✅ Parsed XML from ${url}`);
 
-                    // Process programmes with proper merging
                     let programmes: Program[] = [];
                     if (parsed?.tv?.programme) {
                         programmes = Array.isArray(parsed.tv.programme) 
@@ -97,7 +92,6 @@ const EPGInfo: React.FC<EPGInfoProps> = ({ tvgId, channelName }) => {
                         });
                     }
 
-                    // Merge programmes with validation
                     programmes.forEach(prog => {
                         if (!prog.start || !prog.stop) return;
                         
@@ -106,7 +100,6 @@ const EPGInfo: React.FC<EPGInfoProps> = ({ tvgId, channelName }) => {
                             channelsData[channel] = { tvgId: channel, programme: [] };
                         }
 
-                        // Add programme if it doesn't exist
                         const exists = channelsData[channel].programme.some(
                             existing => existing.start === prog.start && 
                                       existing.stop === prog.stop &&
@@ -129,14 +122,11 @@ const EPGInfo: React.FC<EPGInfoProps> = ({ tvgId, channelName }) => {
                 }
             }
 
-            // Sort all programmes by start time
             Object.keys(channelsData).forEach(channel => {
                 channelsData[channel].programme.sort((a, b) => 
                     parseInt(a.start) - parseInt(b.start)
                 );
             });
-
-            // Save data in chunks with unique indices
             const chunkSize = 500;
             const entries = Object.entries(channelsData);
             const totalChunks = Math.ceil(entries.length / chunkSize);
@@ -171,7 +161,6 @@ const EPGInfo: React.FC<EPGInfoProps> = ({ tvgId, channelName }) => {
                     await fetchAndProcessEPG();
                 }
 
-                // Load chunked data
                 const chunkCount = parseInt(await AsyncStorage.getItem('epgChunkCount') || '0');
                 let epgData = [];
                 
@@ -185,12 +174,11 @@ const EPGInfo: React.FC<EPGInfoProps> = ({ tvgId, channelName }) => {
                 const epgChannel = epgData.find((epg: { tvgId: string }) => 
                     normalizeTvgId(epg.tvgId) === normalizeTvgId(tvgId)
                 ) || null;
-                // Update the loadEPGData function to handle data loading better
+               
                 if (epgChannel) {
                     const nowLocal = DateTime.local().setZone("UTC");
                     const nowString = nowLocal.toFormat("yyyyMMddHHmmss");
     
-                    // Filter out expired programs
                     const validPrograms = epgChannel.programme.filter((prog: Program) => 
                         parseInt(prog.stop) >= parseInt(nowString)
                     );
@@ -251,25 +239,22 @@ const EPGInfo: React.FC<EPGInfoProps> = ({ tvgId, channelName }) => {
           .setZone("Asia/Jakarta").toFormat("HH:mm");
     };
     
-    // Scroll animation for upcoming programs
     useEffect(() => {
-        Animated.loop(
-            Animated.timing(scrollAnim, {
-                toValue: -width,
-                duration: 10000,
-                useNativeDriver: true,
-            }),
-            { iterations: -1 }
-        ).start();
+      Animated.loop(
+        Animated.timing(scrollAnim, {
+            toValue: -width,
+            duration: 10000,
+            useNativeDriver: true,
+        }),
+        { iterations: -1 }
+    ).start();
     }, [scrollAnim, width]);
     
-    // Function to truncate text
     const truncateText = (text: string | undefined, maxLength: number) => {
         if (!text) return "Tidak ada program";
         return text.length > maxLength ? text.substring(0, maxLength) + "..." : text;
     };
     
-    // Loading state
     if (loading) {
         return (
             <View style={styles.loadingContainer}>
@@ -284,7 +269,6 @@ const EPGInfo: React.FC<EPGInfoProps> = ({ tvgId, channelName }) => {
         );
     }
     
-    // Error state
     if (error) {
         return (
             <View style={styles.errorContainer}>

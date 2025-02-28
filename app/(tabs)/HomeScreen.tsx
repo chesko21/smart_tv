@@ -99,7 +99,6 @@ export default function Home() {
     );
   }, [channels]);
 
-  // Add this with other useMemo hooks
   const filteredVOD = useMemo(() => {
     const vodKeywords = [ "movies", "movie", "film", "films", "bioskop", "cinema",
       "sinema", "vod", "video on demand", "box office",
@@ -331,7 +330,7 @@ export default function Home() {
       <TouchableOpacity
         style={styles.card}
         onPress={() => {
-          setPipMode(false); // Set PiP mode to normal
+          setPipMode(false);
           navigation.navigate('PlayerScreen', { url: item.url });
         }}
       >

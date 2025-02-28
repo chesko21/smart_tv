@@ -97,6 +97,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#edec25",
     alignSelf: "flex-start", 
+    gap: 8,
   },
   imageContainer: {
     width: "80%", 

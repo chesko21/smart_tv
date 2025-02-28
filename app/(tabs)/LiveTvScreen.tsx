@@ -242,6 +242,7 @@ const styles = StyleSheet.create({
     height: 120,
     backgroundColor: "#1E293B",
     elevation: 2,
+    gap: 8,
   },
   groupImage: {
     flex: 1,

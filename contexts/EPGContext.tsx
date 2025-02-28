@@ -8,7 +8,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
  * @property {() => Promise<void>} refreshEPG
  */
 
-// Define multiple default EPG URLs
 const defaultEpgUrls = [
   "https://www.open-epg.com/files/indonesia4.xml",
   "https://raw.githubusercontent.com/AqFad2811/epg/main/indonesia.xml"
@@ -29,12 +28,10 @@ export const EPGProvider = ({ children }: { children: React.ReactNode; }) => {
       const initialUrls = defaultEpgUrls.map(url => ({ url, active: true }));
       const storedUrlsArray = storedUrls ? JSON.parse(storedUrls) : [];
 
-      // Normalize GitHub URLs to prevent duplicates
       const normalizeUrl = (url: string) => {
         return url.replace('/refs/heads/main/', '/main/');
       };
 
-      // Combine and deduplicate URLs
       const allUrls = [...initialUrls, ...storedUrlsArray];
       const uniqueUrls = Array.from(
         new Map(

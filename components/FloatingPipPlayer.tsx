@@ -50,6 +50,19 @@ const FloatingPipPlayer = () => {
     setPipMode(false); 
   };
 
+  // New default implementations for onLoadStart, onLoad, and onErrorts
+  const handleLoadStart = () => {
+    console.log('Load started');
+  };
+  
+  const handleLoad = () => {
+    console.log('Load completed');
+  };
+  
+  const handleError = () => {
+    console.log('Error occurred');
+  };
+
   if (!isInPipMode || !pipUrl) return null;
 
   return (
@@ -71,6 +84,9 @@ const FloatingPipPlayer = () => {
           channel={pipChannel}
           paused={false}
           style={styles.pipVideoContainer}
+          onLoadStart={handleLoadStart}
+          onLoad={handleLoad}
+          onError={handleError}
           onPipModeChange={handlePipModeChange}
         />
       </TouchableOpacity>

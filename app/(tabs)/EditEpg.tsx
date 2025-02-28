@@ -100,11 +100,9 @@ const EditEpg = () => {
       }
       console.log('URL is accessible, fetching EPG data...');
 
-      // Fetch and validate EPG XML data
       const response = await axios.get(url);
       console.log('EPG Response status:', response.status);
       
-      // Validate XML structure
       if (!response.data || !response.data.includes('<?xml')) {
         console.log('Invalid EPG XML data received');
         Alert.alert("Invalid EPG XML format");
@@ -122,12 +120,11 @@ const EditEpg = () => {
         return;
       }
 
-      // Save URLs and trigger EPG refresh
       await saveEpgUrls(updatedUrls);
       setEpgUrls(updatedUrls);
       
       console.log('Refreshing EPG data with new URL...');
-      await refreshEPG(); // This will trigger EPGInfo to reload with new URL
+      await refreshEPG();
       console.log('EPG refresh completed');
       
       ToastAndroid.show('EPG URL added and data updated successfully!', ToastAndroid.SHORT);

@@ -14,7 +14,15 @@
       "owner": "chesko25"
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease",
+        "aab": {
+          "buildType": "aab",
+          "gradleCommand": ":app:bundleRelease"
+        }
+      }
     }
   }
 }

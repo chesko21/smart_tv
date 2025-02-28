@@ -7,27 +7,27 @@ import { useNavigation } from "@react-navigation/native";
 import useM3uParse from "../../hooks/M3uParse";
 import { usePip } from '../../contexts/PipContext';
 import Toast from 'react-native-toast-message';
-import { debounce } from 'lodash';
+import Icon from 'react-native-vector-icons/FontAwesome';
 
-const defaultLogo = require("../../assets/images/tv_banner.png");
+const defaultLogo = require("../../assets/images/maskable.png"); 
 
 const SearchScreen = () => {
     const { channels, loading, error, refetch } = useM3uParse();
     const [searchQuery, setSearchQuery] = useState("");
     const [searchPressed, setSearchPressed] = useState(false);
-    const [refreshing, setRefreshing] = useState(false); 
-
+    const [refreshing, setRefreshing] = useState(false);
     const navigation = useNavigation();
     const { setPipMode } = usePip();
-    const allChannels = channels ?? [];
+
+    const allChannels = channels || [];
 
     const filteredChannels = searchPressed && searchQuery.trim() !== ""
-        ? allChannels.filter(channel => 
+        ? allChannels.filter(channel =>
             channel.name?.toLowerCase().includes(searchQuery.toLowerCase().trim())
-          )
+        )
         : [];
 
-    const showToast = (message) => {
+    const showToast = (message: string) => {
         Toast.show({
             type: 'error',
             text1: message,
@@ -36,7 +36,7 @@ const SearchScreen = () => {
         });
     };
 
-    const handleSearch = (text) => {
+    const handleSearch = (text: React.SetStateAction<string>) => {
         setSearchQuery(text);
         if (searchPressed) {
             setSearchPressed(false);
@@ -59,14 +59,24 @@ const SearchScreen = () => {
 
     const onRefresh = async () => {
         setRefreshing(true);
-        await refetch();
+
+        try {
+            await refetch();
+        } catch (err) {
+            showToast("Failed to refresh data");
+        }
         setRefreshing(false);
     };
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: "#000" }}>
             <View style={styles.container}>
-                <Text style={styles.title}>Search TV Channels</Text>
+                <View style={styles.header}>
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+                        <Icon name="arrow-left" size={24} color="#007bff" />
+                    </TouchableOpacity>
+                    <Text style={styles.title}>Search TV Channels</Text>
+                </View>
 
                 <View style={styles.searchContainer}>
                     <View style={styles.inputContainer}>
@@ -80,10 +90,7 @@ const SearchScreen = () => {
                             returnKeyType="search"
                         />
                         {searchQuery.length > 0 && (
-                            <TouchableOpacity
-                                style={styles.clearButton}
-                                onPress={handleClearSearch}
-                            >
+                            <TouchableOpacity style={styles.clearButton} onPress={handleClearSearch}>
                                 <Text style={styles.clearButtonText}>×</Text>
                             </TouchableOpacity>
                         )}
@@ -91,7 +98,7 @@ const SearchScreen = () => {
                     <TouchableOpacity
                         style={[
                             styles.searchButton,
-                            !searchQuery.trim() && styles.searchButtonDisabled
+                            !searchQuery.trim() && styles.searchButtonDisabled,
                         ]}
                         onPress={performSearch}
                         disabled={!searchQuery.trim()}
@@ -117,7 +124,7 @@ const SearchScreen = () => {
                                 onPress={() => {
                                     setPipMode(false);
                                     if (item.url) {
-                                        navigation.navigate("PlayerScreen", { url: item.url });
+                                        navigation.navigate("Home", { screen: "PlayerScreen", params: { url: item.url } });
                                     } else {
                                         alert("URL tidak tersedia!");
                                     }
@@ -127,16 +134,17 @@ const SearchScreen = () => {
                                     source={item.logo ? { uri: item.logo } : defaultLogo}
                                     style={styles.logo}
                                     resizeMode="contain"
-                                    defaultSource={defaultLogo}
+                                    defaultSource={defaultLogo} 
                                 />
                                 <Text style={styles.channelName}>{item.name}</Text>
                             </TouchableOpacity>
                         )}
+                        numColumns={2}
                         refreshControl={
                             <RefreshControl
                                 refreshing={refreshing}
-                                onRefresh={onRefresh} // Trigger refresh function
-                                tintColor="#007bff" // Customize the loading spinner color
+                                onRefresh={onRefresh}
+                                tintColor="#007bff"
                             />
                         }
                     />
@@ -153,12 +161,20 @@ const styles = StyleSheet.create({
         padding: 16,
         paddingTop: 40,
     },
+    header: {
+        flexDirection: "row",
+        alignItems: "center",
+        marginBottom: 16,
+    },
+    backButton: {
+        paddingRight: 8,
+    },
     title: {
         fontSize: 22,
         fontWeight: "bold",
         textAlign: "center",
-        marginBottom: 16,
         color: "#fff",
+        flex: 1, // To center the title within the header
     },
     searchContainer: {
         flexDirection: "row",
@@ -219,28 +235,34 @@ const styles = StyleSheet.create({
         marginBottom: 10,
     },
     channelItem: {
-        flexDirection: "row",
+        flex: 1,
+        flexDirection: "column",
         alignItems: "center",
-        padding: 16,
+        justifyContent: "flex-start",
+        padding: 8,
+        margin: 8,
         backgroundColor: "#1E1E1E",
         borderRadius: 12,
-        marginBottom: 12,
         elevation: 3,
-        shadowColor: "#000",
+        shadowColor: "#0ff",
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.2,
         shadowRadius: 4,
+        maxWidth: '48%',
+        aspectRatio: 1,
     },
     logo: {
-        width: 50,
-        height: 50,
+        width: 80,
+        height: 80,
         borderRadius: 8,
-        marginRight: 12,
+        marginBottom: 10,
+        backgroundColor: "#666",
     },
     channelName: {
-        fontSize: 16,
+        fontSize: 14,
         fontWeight: "bold",
         color: "#fff",
+        textAlign: "center",
     },
     noResults: {
         textAlign: "center",
