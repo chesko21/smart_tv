@@ -6,16 +6,23 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "owner": "chesko25"
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "owner": "chesko25"
     },
     "production": {
+<<<<<<< HEAD
       "autoIncrement": true
+=======
+      "autoIncrement": true,
+      "android": {
+        "gradleCommand": ":app:assembleRelease"
+      },
+      "owner": "chesko25"
+>>>>>>> 78312dba48aaea127d33055f6c8af608114608da
     }
-  },
-  "submit": {
-    "production": {}
   }
 }
