@@ -14,15 +14,7 @@
       "owner": "chesko25"
     },
     "production": {
-<<<<<<< HEAD
       "autoIncrement": true
-=======
-      "autoIncrement": true,
-      "android": {
-        "gradleCommand": ":app:assembleRelease"
-      },
-      "owner": "chesko25"
->>>>>>> 78312dba48aaea127d33055f6c8af608114608da
     }
   }
 }
