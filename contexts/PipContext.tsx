@@ -21,7 +21,8 @@ export const PipProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [pipUrl, setPipUrl] = useState<string | null>(null);
   const [pipChannel, setPipChannel] = useState<any>(null);
 
-  const setPipMode = (isInPip: boolean, url?: string, channel?: any) => {
+const setPipMode = (isInPip: boolean, url?: string, channel?: any) => {
+
     setIsInPipMode(isInPip);
     if (url) setPipUrl(url);
     if (channel) setPipChannel(channel);

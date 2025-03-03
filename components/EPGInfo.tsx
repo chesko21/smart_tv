@@ -332,7 +332,6 @@ const EPGInfo: React.FC<EPGInfoProps> = ({ tvgId, channelName }) => {
     );
 };
 
-// Styling for the component
 const styles = StyleSheet.create({
   loadingContainer: {
     flex: 1,

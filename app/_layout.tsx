@@ -19,7 +19,7 @@ const baseHeight = Dimensions.get('window').height;
 
 
 const scale = Math.min(SCREEN_WIDTH / baseWidth, SCREEN_HEIGHT / baseHeight);
-const moderateScale = (size: number, factor = 0.5) => size + (scale - 1) * factor;
+const moderateScale = (size: number, factor = 0.4) => size + (scale - 1) * factor;
 
 
 export default function Layout() {

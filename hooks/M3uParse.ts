@@ -16,8 +16,6 @@ export interface Channel {
     url: string;
     group: string;
     logo: string | null;
-    license_type: string;
-    license_key: string | null;
     userAgent: string;
     referrer: string | null;
     videoTracks?: VideoTrack[];
@@ -26,7 +24,7 @@ export interface Channel {
 const DEFAULT_M3U_URLS = [
     { url: "https://pastebin.com/raw/JyCSD9r1", enabled: true },
     { url: "https://raw.githubusercontent.com/chesko21/tv-online-m3u/refs/heads/my-repo/testing.m3u", enabled: false },
-    { url: "https://raw.githubusercontent.com/chesko21/tv-online-m3u/refs/heads/my-repo/Tvku.m3u" , enabled: false },
+    { url: "https://raw.githubusercontent.com/chesko21/tv-online-m3u/refs/heads/my-repo/Tvku.m3u", enabled: false },
 ];
 
 const CACHE_KEY = "m3u_channels_cache";
@@ -41,14 +39,15 @@ const useM3uParse = () => {
     const [error, setError] = useState<string | null>(null);
     const [isFetching, setIsFetching] = useState<boolean>(false);
     const [userUrls, setUserUrls] = useState<string[]>([]);
-    const [defaultUrls, setDefaultUrls] = useState<Array<{ url: string; enabled: boolean }>>([]);
+    const [defaultUrls, setDefaultUrls] = useState<Array<{ url: string; enabled: boolean }>>(DEFAULT_M3U_URLS);
 
-    // Function to validate URL format
-    const isValidUrl = (url: string) => {
+    // Validate URL format
+    const isValidUrl = useCallback((url: string) => {
         const urlPattern = /^(https?:\/\/)[\w\-]+(\.[\w\-]+)+([\/\w\-\.]*)*\/?$/;
         return urlPattern.test(url);
-    };
+    }, []);
 
+    // Fetch M3U data from the active URL
     const fetchM3u = useCallback(async () => {
         setIsFetching(true);
         setError(null);
@@ -73,8 +72,6 @@ const useM3uParse = () => {
                 return;
             }
 
-            let allChannels: Channel[] = [];
-
             try {
                 const response = await axios.get(activeUrl, { timeout: 10000 });
                 const data = response.data;
@@ -83,12 +80,11 @@ const useM3uParse = () => {
 
                 const lines = data.split("\n");
                 let currentChannel: Partial<Channel> = {};
-                
+                const allChannels: Channel[] = [];
+
                 for (const line of lines) {
                     const trimmedLine = line.trim();
-                    let licenseKey: string | null = null;
 
-                    // Parsing EXTINF line
                     if (trimmedLine.startsWith("#EXTINF")) {
                         const tvgIdMatch = trimmedLine.match(/tvg-id="([^"]+)"/);
                         const logoMatch = trimmedLine.match(/tvg-logo="([^"]+)"/);
@@ -101,20 +97,9 @@ const useM3uParse = () => {
                             group: groupMatch ? groupMatch[1] : "Unknown",
                             name: nameMatch || "Unknown Channel",
                             url: "",
-                            license_type: "None",
-                            license_key: null,
                             userAgent: "Default",
                             referrer: null,
                         };
-                    }
-
-                    // Handling license type and key parsing
-                    if (trimmedLine.startsWith("#KODIPROP:inputstream.adaptive.license_type=")) {
-                        currentChannel.license_type = trimmedLine.split("=")[1] || "None";
-                    } else if (trimmedLine.startsWith("#KODIPROP:inputstream.adaptive.license_key=")) {
-                        const keyMatch = trimmedLine.match(/^#KODIPROP:inputstream.adaptive.license_key=(.*)$/);
-                        licenseKey = keyMatch ? keyMatch[1].trim() : null;
-                        currentChannel.license_key = licenseKey;
                     }
 
                     if (trimmedLine.startsWith("#EXTVLCOPT:http-user-agent=")) {
@@ -130,24 +115,23 @@ const useM3uParse = () => {
                     }
                 }
 
-                // Removing duplicates and caching channels
                 const uniqueChannels = Array.from(new Map(allChannels.map(ch => [ch.url, ch])).values());
                 const uniqueGroups = Array.from(new Set(uniqueChannels.map(ch => ch.group)));
 
                 await AsyncStorage.setItem(CACHE_KEY, JSON.stringify({ channels: uniqueChannels }));
 
-                setChannels(uniqueChannels);
-                setGroups(uniqueGroups);
+                setChannels(Array.from(uniqueChannels));
+                setGroups(Array.from(uniqueGroups));
             } catch (error) {
                 console.error(`❌ Error fetching M3U from active URL:`, error);
                 if (axios.isAxiosError(error)) {
-                    if (error.response) {
-                        setError(`Server responded with status ${error.response.status}`);
-                    } else if (error.request) {
-                        setError("No response received. Check your network connection.");
-                    } else {
-                        setError("Error: " + error.message);
-                    }
+                    setError(
+                        error.response
+                            ? `Server responded with status ${error.response.status}`
+                            : error.request
+                            ? "No response received. Check your network connection."
+                            : "Error: " + error.message
+                    );
                 } else {
                     setError("An unexpected error occurred.");
                 }
@@ -159,47 +143,57 @@ const useM3uParse = () => {
             setLoading(false);
             setIsFetching(false);
         }
-    }, []);
+    }, [isValidUrl]);
 
-    const addUrl = useCallback(async (newUrl: string) => {
-        if (newUrl.trim() === "" || userUrls.includes(newUrl.trim())) return;
-        const updatedUrls = [...userUrls, newUrl.trim()];
+    // Add a new URL to the user URLs list
+    const addUrl = useCallback(
+        async (newUrl: string) => {
+            if (newUrl.trim() === "" || userUrls.includes(newUrl.trim())) return;
+            const updatedUrls = [...userUrls, newUrl.trim()];
 
-        try {
-            await AsyncStorage.setItem(USER_M3U_URLS_KEY, JSON.stringify(updatedUrls));
-            setUserUrls(updatedUrls);
-            await saveActiveUrl(newUrl.trim()); // Optionally set as active URL
-        } catch (error) {
-            console.error("Failed to save URL:", error);
-            setError("Failed to save URL.");
-        }
-    }, [userUrls]);
-
-    const deleteUrl = useCallback(async (urlToDelete: string) => {
-        const updatedUrls = userUrls.filter(url => url !== urlToDelete);
-        try {
-            await AsyncStorage.setItem(USER_M3U_URLS_KEY, JSON.stringify(updatedUrls));
-            setUserUrls(updatedUrls);
-            const currentActiveUrl = await loadActiveUrl();
-            if (currentActiveUrl === urlToDelete) {
-                await AsyncStorage.removeItem(ACTIVE_URL_KEY);
-                refetch(); // Refetch channels after deletion if necessary
+            try {
+                await AsyncStorage.setItem(USER_M3U_URLS_KEY, JSON.stringify(updatedUrls));
+                setUserUrls(updatedUrls);
+                await saveActiveUrl(newUrl.trim());
+            } catch (error) {
+                console.error("Failed to save URL:", error);
+                setError("Failed to save URL.");
             }
-        } catch (error) {
-            console.error("❌ Failed to delete URL:", error);
-            setError("Failed to delete URL.");
-        }
-    }, [userUrls, refetch]);
+        },
+        [userUrls]
+    );
 
-    const saveActiveUrl = async (url: string) => {
+    // Delete a URL from the user URLs list
+    const deleteUrl = useCallback(
+        async (urlToDelete: string) => {
+            const updatedUrls = userUrls.filter(url => url !== urlToDelete);
+            try {
+                await AsyncStorage.setItem(USER_M3U_URLS_KEY, JSON.stringify(updatedUrls));
+                setUserUrls(updatedUrls);
+                const currentActiveUrl = await loadActiveUrl();
+                if (currentActiveUrl === urlToDelete) {
+                    await AsyncStorage.removeItem(ACTIVE_URL_KEY);
+                    refetch();
+                }
+            } catch (error) {
+                console.error("❌ Failed to delete URL:", error);
+                setError("Failed to delete URL.");
+            }
+        },
+        [userUrls, refetch]
+    );
+
+    // Save the active URL
+    const saveActiveUrl = useCallback(async (url: string) => {
         try {
             await AsyncStorage.setItem(ACTIVE_URL_KEY, url);
-            refetch(); // Refetch channels after saving active URL
+            refetch();
         } catch (error) {
             console.error("Failed to save active URL:", error);
         }
-    };
+    }, [refetch]);
 
+    // Load the active URL
     const loadActiveUrl = useCallback(async () => {
         try {
             const activeUrl = await AsyncStorage.getItem(ACTIVE_URL_KEY);
@@ -210,34 +204,38 @@ const useM3uParse = () => {
         }
     }, []);
 
-    const searchChannels = useCallback((query: string) => {
-        if (!query) {
-            return channels;
-        }
-        return channels.filter(channel => channel.name.toLowerCase().includes(query.toLowerCase()));
-    }, [channels]);
+    // Search channels by name
+    const searchChannels = useCallback(
+        (query: string) => {
+            if (!query) return channels;
+            return channels.filter(channel => channel.name.toLowerCase().includes(query.toLowerCase()));
+        },
+        [channels]
+    );
 
+    // Refetch M3U data
     const refetch = useCallback(() => {
         fetchM3u();
     }, [fetchM3u]);
 
+    // Fetch M3U data on mount
     useEffect(() => {
         fetchM3u();
     }, [fetchM3u]);
 
-    return { 
-        channels, 
-        groups, 
-        loading, 
-        error, 
+    return {
+        channels,
+        groups,
+        loading,
+        error,
         refetch,
         searchChannels,
-        userUrls, 
-        addUrl, 
-        deleteUrl, 
-        defaultUrls, 
-        saveActiveUrl, 
-        loadActiveUrl 
+        userUrls,
+        addUrl,
+        deleteUrl,
+        defaultUrls,
+        saveActiveUrl,
+        loadActiveUrl,
     };
 };
 

@@ -4,7 +4,7 @@
     "target": "es2016",
     "lib": ["es6", "dom"],
     "allowJs": true,
-    "jsx": "react-native",
+    "jsx": "react",
     "moduleResolution": "node",
     "strict": true,
     "noEmit": true,

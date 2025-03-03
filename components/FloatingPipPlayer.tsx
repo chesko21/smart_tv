@@ -2,8 +2,7 @@ import React, { useState, useRef } from 'react';
 import { View, StyleSheet, Dimensions, PanResponder, TouchableOpacity, Text } from 'react-native';
 import VideoPlayer from './VideoPlayer';
 import { usePip } from '../contexts/PipContext';
-import Icon from "@expo/vector-icons/MaterialIcons"; // Importing Material Icons
-
+import Icon from "@expo/vector-icons/MaterialIcons"; 
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 

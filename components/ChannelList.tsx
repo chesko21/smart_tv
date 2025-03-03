@@ -27,7 +27,6 @@ interface ChannelListProps {
   onChannelSelect?: (channel: Channel) => void;
 }
 
-// Shuffle function to randomize channel order
 const shuffleArray = (array: Channel[]) => {
   const shuffledArray = [...array];
   for (let i = shuffledArray.length - 1; i > 0; i--) {
@@ -105,15 +104,15 @@ const ChannelList: React.FC<ChannelListProps> = ({
   const { isInPipMode, exitPip } = usePip();
 
   useEffect(() => {
-    // Find the current channel
+
     const currentChannel = channels.find(channel => channel.url === currentChannelUrl);
     if (currentChannel && currentChannel.group) {
-      // Filter channels that belong to the same group as the current channel
+
       const filteredChannels = channels.filter(channel => channel.group === currentChannel.group && channel.url !== currentChannelUrl);
-      const shuffledChannels = shuffleArray(filteredChannels).slice(0, 10); // Shuffle and take only the first 10
+      const shuffledChannels = shuffleArray(filteredChannels).slice(0, 10); 
       setRecommendedChannels(shuffledChannels);
     } else {
-      setRecommendedChannels([]); // Clear recommendations if no valid channel is found
+      setRecommendedChannels([]); 
     }
   }, [currentChannelUrl, channels]);
 
