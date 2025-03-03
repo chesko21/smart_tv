@@ -10,7 +10,11 @@
     "jsEngine": "hermes",
     "ios": {
       "supportsTablet": true,
-      "jsEngine": "jsc"
+      "jsEngine": "jsc",
+      "bundleIdentifier": "com.chesko25.smarttv",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.chesko25.smarttv",
