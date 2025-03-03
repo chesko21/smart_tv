@@ -16,14 +16,14 @@ import Colors from "../../constants/Colors";
 import DEFAULT_CATEGORY_IMAGE from "../../assets/images/maskable.png";
 import { useNavigation } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import LottieView from 'lottie-react-native';  
+import LottieView from 'lottie-react-native';
 import { usePip } from '../../contexts/PipContext';
 
 const LiveTV = () => {
   const router = useRouter();
   const navigation = useNavigation();
   const { channels, groups, loading, error, refetch } = useM3uParse();
-  const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
+  const [selectedGroup, setSelectedGroup] = useState < string | null > (null);
   const [refreshing, setRefreshing] = useState(false);
   const { setPipMode } = usePip();
 
@@ -48,13 +48,13 @@ const LiveTV = () => {
       channel={item}
       onPress={() => {
         hideTabBar();
-        setPipMode(false); 
+        setPipMode(false);
         navigation.navigate('PlayerScreen', { url: item.url });
       }}
     />
   ), [hideTabBar, navigation, setPipMode]);
 
-  
+
 
   const renderGroupItem = useCallback(({ item }) => (
     <TouchableOpacity
@@ -73,7 +73,7 @@ const LiveTV = () => {
     </TouchableOpacity>
   ), []);
 
-  const { top } = useSafeAreaInsets(); 
+  const { top } = useSafeAreaInsets();
 
   useEffect(() => {
     return () => {
@@ -84,20 +84,20 @@ const LiveTV = () => {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-        await refetch(); 
+      await refetch();
     } catch (error) {
-        console.error("Error refreshing:", error);
+      console.error("Error refreshing:", error);
     } finally {
-        setRefreshing(false);
+      setRefreshing(false);
     }
-}, [refetch]);
+  }, [refetch]);
 
   return (
     <SafeAreaView style={styles.container}>
       {loading ? (
         <View style={styles.loadingContainer}>
           <LottieView
-            source={require("../../assets/animations/loading.json")} 
+            source={require("../../assets/animations/loading.json")}
             autoPlay
             loop
             style={styles.lottie}
@@ -107,7 +107,7 @@ const LiveTV = () => {
       ) : error ? (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Error: {error.message}</Text>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.reloadButton}
             onPress={refetch}
           >
@@ -117,7 +117,7 @@ const LiveTV = () => {
       ) : selectedGroup ? (
         <>
           <TouchableOpacity
-            style={[styles.backButton, { marginTop: top + 10 }]} 
+            style={[styles.backButton, { marginTop: top + 10 }]}
             onPress={() => {
               setSelectedGroup(null);
               showTabBar();
@@ -127,21 +127,21 @@ const LiveTV = () => {
           </TouchableOpacity>
 
           <FlatList
-    key={`channels-${selectedGroup}`}
-    data={filteredChannels}
-    numColumns={3}
-    keyExtractor={(item) => item.url}
-    contentContainerStyle={styles.channelList}
-    renderItem={renderChannelItem}
-    refreshControl={
-        <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh} 
-            colors={[Colors.primary]}
-            tintColor={Colors.primary}
-        />
-    }
-/>
+            key={`channels-${selectedGroup}`}
+            data={filteredChannels}
+            numColumns={3}
+            keyExtractor={(item) => item.url}
+            contentContainerStyle={styles.channelList}
+            renderItem={renderChannelItem}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                colors={[Colors.primary]}
+                tintColor={Colors.primary}
+              />
+            }
+          />
         </>
       ) : (
         <>

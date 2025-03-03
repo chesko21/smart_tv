@@ -1,16 +1,7 @@
-import React, { useState , useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { View, Text, Image, TouchableOpacity, StyleSheet, ActivityIndicator } from "react-native";
-
 import defaultLogo from "../assets/images/tv_banner.png";
 
-export interface ChannelProps {
-  channel: {
-    name: string;
-    url: string;
-    logo?: string;
-  };
-  onPress: () => void;
-}
 export interface Channel {
   name: string;
   group: string;
@@ -18,6 +9,12 @@ export interface Channel {
   logo?: string;
   tvgId?: string;
 }
+
+export interface ChannelProps {
+  channel: Channel;
+  onPress: () => void;
+}
+
 const truncateName = (name: string, limit: number) => {
   return name.length > limit ? `${name.substring(0, limit)}...` : name;
 };
@@ -29,7 +26,7 @@ const LiveTVCard: React.FC<ChannelProps> = ({ channel, onPress }) => {
 
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
-    
+
     if (channel.logo && isLoading) {
       timeoutId = setTimeout(() => {
         setIsTimeout(true);
@@ -44,6 +41,20 @@ const LiveTVCard: React.FC<ChannelProps> = ({ channel, onPress }) => {
     };
   }, [channel.logo, isLoading]);
 
+  const handleImageLoadStart = () => {
+    setIsLoading(true);
+    setIsTimeout(false);
+  };
+
+  const handleImageLoad = () => {
+    setIsLoading(false);
+    setIsTimeout(false);
+  };
+
+  const handleImageError = () => {
+    setHasError(true);
+    setIsLoading(false);
+  };
 
   return (
     <TouchableOpacity
@@ -64,18 +75,9 @@ const LiveTVCard: React.FC<ChannelProps> = ({ channel, onPress }) => {
           defaultSource={defaultLogo}
           style={[styles.image, isLoading && styles.hiddenImage]}
           resizeMode="cover"
-          onLoadStart={() => {
-            setIsLoading(true);
-            setIsTimeout(false);
-          }}
-          onLoad={() => {
-            setIsLoading(false);
-            setIsTimeout(false);
-          }}
-          onError={() => {
-            setHasError(true);
-            setIsLoading(false);
-          }}
+          onLoadStart={handleImageLoadStart}
+          onLoad={handleImageLoad}
+          onError={handleImageError}
         />
       </View>
       <Text style={styles.text} numberOfLines={1}>
@@ -87,20 +89,20 @@ const LiveTVCard: React.FC<ChannelProps> = ({ channel, onPress }) => {
 
 const styles = StyleSheet.create({
   cardContainer: {
-    width: "30%", 
+    width: "30%",
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#333",
     borderRadius: 10,
     padding: 10,
-    margin: 6, 
+    margin: 6,
     borderWidth: 1,
     borderColor: "#edec25",
-    alignSelf: "flex-start", 
+    alignSelf: "flex-start",
     gap: 8,
   },
   imageContainer: {
-    width: "80%", 
+    width: "80%",
     aspectRatio: 1,
     justifyContent: "center",
     alignItems: "center",

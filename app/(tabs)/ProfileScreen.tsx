@@ -128,7 +128,7 @@ const ProfileScreen = () => {
             setUser(userData);
             setEditedUser(userData);
             setEditModalVisible(false);
-            userUpdateEmitter.emit('userUpdate'); // Emit event here
+            userUpdateEmitter.emit('userUpdate'); 
         } catch (e) {
             console.error("Failed to save user data to storage", e);
         }
@@ -264,7 +264,7 @@ const ProfileScreen = () => {
                     style={styles.thumbnail}
                     defaultSource={{ uri: defaultLogo }}
                     onError={(e) => {
-                        console.log("Error loading image:", item.logo);
+                      //  console.log("Error loading image:", item.logo);
                     }}
                 />
                 <View style={styles.overlay}>
@@ -287,10 +287,9 @@ const ProfileScreen = () => {
     );
 
     useEffect(() => {
-        // Simulate a loading process
         setTimeout(() => {
             setIsLoading(false);
-        }, 3000);
+        }, 2000);
     }, []);
 
     if (isLoading) {
@@ -322,7 +321,6 @@ const ProfileScreen = () => {
                 contentContainerStyle={styles.flatlistContentContainer}
             />
 
-            {/* Edit Profile Modal */}
             <Modal
                 animationType="slide"
                 transparent={true}

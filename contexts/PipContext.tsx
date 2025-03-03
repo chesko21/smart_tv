@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext } from 'react';
+import React, { createContext, useState, useContext, useCallback } from 'react';
 
 interface PipContextType {
   isInPipMode: boolean;
@@ -21,18 +21,17 @@ export const PipProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [pipUrl, setPipUrl] = useState<string | null>(null);
   const [pipChannel, setPipChannel] = useState<any>(null);
 
-const setPipMode = (isInPip: boolean, url?: string, channel?: any) => {
-
+  const setPipMode = useCallback((isInPip: boolean, url?: string, channel?: any) => {
     setIsInPipMode(isInPip);
     if (url) setPipUrl(url);
     if (channel) setPipChannel(channel);
-  };
+  }, []);
 
-  const exitPip = () => {
+  const exitPip = useCallback(() => {
     setIsInPipMode(false);
     setPipUrl(null);
     setPipChannel(null);
-  };
+  }, []);
 
   return (
     <PipContext.Provider value={{ isInPipMode, pipUrl, pipChannel, setPipMode, exitPip }}>

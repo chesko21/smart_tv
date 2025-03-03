@@ -35,6 +35,10 @@ const Vod = () => {
   const router = useRouter();
   const { channels, loading, refetch, error } = useM3uParse();
   const [refreshing, setRefreshing] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(20);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
   interface Channel {
     tvgId?: string;
     name: string;
@@ -57,7 +61,7 @@ const Vod = () => {
 
   const groupKeywords = [
    "movies", "movie", "film", "films", "bioskop", "cinema",
-      "sinema", "vod", "video on demand", "box office",
+      "film", "sinema", "vod", "video on demand", "box office",
       "action", "adventure", "comedy", "drama", "horror", "thriller",
       "romance", "documentary", "animation", "anime", "fantasy",
       "sci-fi", "mystery", "crime", "family", "musical",
@@ -80,11 +84,10 @@ const Vod = () => {
     }
 }, [channels]);
 
-
   const refresh = async () => {
     setRefreshing(true);
     try {
-      await refetch(); 
+      refetch(); 
     } catch (error) {
       console.error("Error refreshing VOD data:", error);
     } finally {
@@ -152,7 +155,7 @@ const Vod = () => {
     [navigation, loadingStates, errorStates]
   );
 
-  const truncateName = (name, limit) => (name.length > limit ? name.slice(0, limit) + "..." : name);
+  const truncateName = (name: string, limit: number) => (name.length > limit ? name.slice(0, limit) + "..." : name);
 
   const onRefresh = useCallback(() => {
     refresh();
@@ -208,6 +211,18 @@ const Vod = () => {
     };
   }, []);
 
+  const loadMoreData = () => {
+    if (!isLoadingMore && vodData.length > currentPage * itemsPerPage) {
+      setIsLoadingMore(true);
+      setCurrentPage(prevPage => prevPage + 1);
+      setIsLoadingMore(false);
+    }
+  };
+
+  const paginatedData = useMemo(() => {
+    return vodData.slice(0, currentPage * itemsPerPage);
+  }, [vodData, currentPage, itemsPerPage]);
+
   if (loading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
@@ -259,13 +274,22 @@ const Vod = () => {
       )}
 
       <FlatList
-        data={vodData}
+        data={paginatedData}
         keyExtractor={(item, index) => `${item.tvgId || item.name}-${index}`}
         numColumns={3}
         columnWrapperStyle={{ justifyContent: "space-between" }}
         contentContainerStyle={{ padding: 10 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         renderItem={renderVodItem}
+        onEndReached={loadMoreData}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={
+          isLoadingMore ? (
+            <View style={styles.loadingMoreContainer}>
+              <ActivityIndicator size="small" color="#edec25" />
+            </View>
+          ) : null
+        }
       />
     </SafeAreaView>
   );
@@ -390,7 +414,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-
+  loadingMoreContainer: {
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
 });
 
 export default Vod;

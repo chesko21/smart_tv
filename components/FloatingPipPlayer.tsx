@@ -1,14 +1,14 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { View, StyleSheet, Dimensions, PanResponder, TouchableOpacity, Text } from 'react-native';
 import VideoPlayer from './VideoPlayer';
 import { usePip } from '../contexts/PipContext';
-import Icon from "@expo/vector-icons/MaterialIcons"; 
+import Icon from "@expo/vector-icons/MaterialIcons";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const FloatingPipPlayer = () => {
   const { isInPipMode, pipUrl, pipChannel, setPipMode } = usePip();
-  const [pipPosition, setPipPosition] = useState({ x: SCREEN_WIDTH - 220, y: SCREEN_HEIGHT - 180 }); // Adjusted for padding
+  const [pipPosition, setPipPosition] = useState({ x: SCREEN_WIDTH - 220, y: SCREEN_HEIGHT - 180 });
   const isDragging = useRef(false);
 
   const panResponder = useRef(
@@ -22,11 +22,11 @@ const FloatingPipPlayer = () => {
         if (isDragging.current) {
           const newX = Math.min(
             Math.max(pipPosition.x + gestureState.dx, 0),
-            SCREEN_WIDTH - 200 
+            SCREEN_WIDTH - 200
           );
           const newY = Math.min(
             Math.max(pipPosition.y + gestureState.dy, 0),
-            SCREEN_HEIGHT - 160 
+            SCREEN_HEIGHT - 160
           );
           setPipPosition({ x: newX, y: newY });
         }
@@ -37,13 +37,13 @@ const FloatingPipPlayer = () => {
     })
   ).current;
 
-  const handlePress = () => {
+  const handlePress = useCallback(() => {
     setPipMode(false);
-  };
+  }, [setPipMode]);
 
-  const handleLoadStart = () => console.log('Load started');
-  const handleLoad = () => console.log('Load completed');
-  const handleError = () => console.log('Error occurred');
+  const handleLoadStart = useCallback(() => console.log('Load started'), []);
+  const handleLoad = useCallback(() => console.log('Load completed'), []);
+  const handleError = useCallback(() => console.log('Error occurred'), []);
 
   if (!isInPipMode || !pipUrl) return null;
 
@@ -71,7 +71,7 @@ const FloatingPipPlayer = () => {
 
         <View style={styles.overlay}>
           <Text style={styles.channelText}>
-            {pipChannel?.name || "Live Channel"} 
+            {pipChannel?.name || "Live Channel"}
           </Text>
           <TouchableOpacity style={styles.closeButton} onPress={handlePress}>
             <Icon name="close" size={24} color="#fff" />
@@ -86,7 +86,7 @@ const styles = StyleSheet.create({
   pipContainer: {
     position: 'absolute',
     width: 200,
-    height: 180, 
+    height: 180,
     backgroundColor: '#000',
     borderRadius: 4,
     borderColor: '#fff',
@@ -100,12 +100,12 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 4,
     overflow: 'hidden',
-    position: 'relative', 
+    position: 'relative',
   },
   videoCentered: {
     width: '100%',
     height: '100%',
-    alignItems: 'center', 
+    alignItems: 'center',
   },
   overlay: {
     position: 'absolute',
@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)', 
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     padding: 4,
   },
   channelText: {

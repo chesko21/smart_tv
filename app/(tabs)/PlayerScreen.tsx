@@ -11,6 +11,7 @@ import {
   ScrollView,
   RefreshControl,
   BackHandler,
+  Platform,
 } from "react-native";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import useM3uParse from "../../hooks/M3uParse";
@@ -21,10 +22,25 @@ import EPGInfo from "../../components/EPGInfo";
 import ChannelList from "../../components/ChannelList";
 import { usePip } from '../../contexts/PipContext';
 import * as ScreenOrientation from 'expo-screen-orientation';
+import default_logo from "../../assets/images/tv_banner.png";
+
 
 export const watchHistoryEvent = new EventEmitter();
 
-const PlayerScreen = ({ route }) => {
+interface PlayerScreenProps {
+  route: {
+    params?: {
+      url?: string;
+    };
+  };
+}
+
+interface VideoDimensions {
+  width: number;
+  height: number;
+}
+
+const PlayerScreen: React.FC<PlayerScreenProps> = ({ route }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const { url } = route.params || {};
   const { channels, refetch, upcomingProgrammes } = useM3uParse();
@@ -32,9 +48,9 @@ const PlayerScreen = ({ route }) => {
   const { width } = useWindowDimensions();
   const selectedChannel = channels.find((channel) => channel.url === url);
   const channelName = selectedChannel?.name || "Unknown Channel";
-  
+
   const [isPlaying, setIsPlaying] = useState(!!url);
-  const [videoDimensions, setVideoDimensions] = useState({
+  const [videoDimensions, setVideoDimensions] = useState<VideoDimensions>({
     width: width,
     height: Dimensions.get("window").height * 0.4,
   });
@@ -56,53 +72,63 @@ const PlayerScreen = ({ route }) => {
   useEffect(() => {
     const handleBackPress = () => {
       if (isInPipMode) {
-          handlePipModeChange(false);
-          return true; 
+        handlePipModeChange(false);
+        return true;
       }
-      return false; 
-  };
+      return false;
+    };
+
     BackHandler.addEventListener("hardwareBackPress", handleBackPress);
     return () => {
       BackHandler.removeEventListener("hardwareBackPress", handleBackPress);
     };
   }, [isInPipMode]);
 
-  useFocusEffect(
-    useCallback(() => {
-      const resumeVideo = () => {
-        if (!isInPipMode) {
-          setIsPlaying(true);
-        }
-      };
+  useEffect(() => {
+    const lockOrientation = async () => {
+      await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+    };
 
-      const pauseVideo = () => {
-        setIsPlaying(false);
-      };
+    lockOrientation();
 
-      const unsubscribeFocus = navigation.addListener("focus", resumeVideo);
-      const unsubscribeBlur = navigation.addListener("blur", pauseVideo);
+    return () => {
+      lockOrientation();
+    };
+  }, []);
 
-      return () => {
-        unsubscribeFocus();
-        unsubscribeBlur();
-      };
-    }, [navigation, isInPipMode])
-  );
 
-  const handleLoadStart = () => {
+  useEffect(() => {
+    const unsubscribeFocus = navigation.addListener('focus', () => {
+      if (!isInPipMode) {
+        setIsPlaying(true);
+      }
+    });
+
+    return unsubscribeFocus;
+  }, [navigation, isInPipMode]);
+
+  useEffect(() => {
+    const unsubscribeBlur = navigation.addListener('blur', () => {
+      setIsPlaying(false);
+    });
+
+    return unsubscribeBlur;
+  }, [navigation]);
+
+  const handleLoadStart = useCallback(() => {
     setIsPlaying(false);
-  };
+  }, []);
 
-  const handleLoad = () => {
+  const handleLoad = useCallback(() => {
     setIsPlaying(true);
     saveWatchHistory(url, channelName);
-  };
+  }, [url, channelName]);
 
-  const handleBuffer = ({ isBuffering }) => {
+  const handleBuffer = useCallback(({ isBuffering }: { isBuffering: boolean }) => {
     setIsPlaying(!isBuffering);
-  };
+  }, []);
 
-  const handleError = () => {
+  const handleError = useCallback(() => {
     setIsPlaying(false);
     Toast.show({
       type: "error",
@@ -113,7 +139,7 @@ const PlayerScreen = ({ route }) => {
       autoHide: true,
     });
     handleRefresh();
-  };
+  }, [handleRefresh]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -131,23 +157,30 @@ const PlayerScreen = ({ route }) => {
     }
   }, [refetch]);
 
-  const handlePipModeChange = useCallback((isInPipMode: boolean | ((prevState: boolean) => boolean)) => {
+  const handlePipModeChange = useCallback((isInPipMode: boolean) => {
+    console.log("PiP mode changed:", isInPipMode);
     setIsInPipMode(isInPipMode);
     setPipMode(isInPipMode, url, selectedChannel);
     setIsPlaying(!isInPipMode);
+
+    if (Platform.OS === 'android') {
+      // Additional Android-specific PiP logic
+    } else if (Platform.OS === 'ios') {
+      // Additional iOS-specific PiP logic
+    }
   }, [url, selectedChannel, setPipMode]);
 
-  const saveWatchHistory = async (videoUrl: any, channelName: string) => {
-      try {
-        const existingHistory = await AsyncStorage.getItem('watchHistory');
-        const history = existingHistory ? JSON.parse(existingHistory) : [];
-        const newEntry = { 
-          url: videoUrl, 
-          name: channelName, 
-          timestamp: Date.now(),
-          logo: selectedChannel?.tvgLogo || selectedChannel?.logo || "https://img.lovepik.com/png/20231108/cute-cartoon-water-drop-coloring-page-can-be-used-for_531960_wh860.png"
-        };
-      
+  const saveWatchHistory = useCallback(async (videoUrl: string, channelName: string) => {
+    try {
+      const existingHistory = await AsyncStorage.getItem('watchHistory');
+      const history = existingHistory ? JSON.parse(existingHistory) : [];
+      const newEntry = {
+        url: videoUrl,
+        name: channelName,
+        timestamp: Date.now(),
+        logo: selectedChannel?.logo || "default_logo"
+      };
+
       const updatedHistory = [newEntry, ...history].filter((item, index, self) =>
         index === self.findIndex(t => t.url === item.url)
       );
@@ -156,25 +189,18 @@ const PlayerScreen = ({ route }) => {
       watchHistoryEvent.emit("historyUpdated");
     } catch (error) {
       console.error("Failed to save watch history:", error);
+      Toast.show({
+        type: "error",
+        text1: "Failed to Save History",
+        text2: "There was an error saving your watch history.",
+      });
     }
-  };
-  const handleFullscreenChange = useCallback(async (fullscreen: boolean | ((prevState: boolean) => boolean)) => {
-    setIsFullscreen(fullscreen);
-    if (fullscreen) {
-      await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE_RIGHT);
-    } else {
-      await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-    }
-  }, []);
-  useEffect(() => {
-    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-    return () => {
-      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-    };
-  }, []);
+  }, [selectedChannel]);
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar hidden={true} />
+
       <ScrollView
         contentContainerStyle={styles.scrollViewContent}
         bounces={true}
@@ -186,18 +212,18 @@ const PlayerScreen = ({ route }) => {
           {url ? (
             <View style={[styles.videoContainer, videoDimensions]}>
               <VideoPlayer
+                key={url} 
                 url={url}
                 channel={selectedChannel}
                 onError={handleError}
                 paused={!isPlaying}
-               style={{ height: "100%", width: "100%" }}
+                style={{ height: "100%", width: "100%" }}
                 onRefresh={handleRefresh}
                 onPipModeChange={handlePipModeChange}
                 isPipEnabled={true}
                 onLoadStart={handleLoadStart}
                 onLoad={handleLoad}
                 onBuffer={handleBuffer}
-                onFullscreenChange={handleFullscreenChange}
               />
             </View>
           ) : (
@@ -206,9 +232,9 @@ const PlayerScreen = ({ route }) => {
             </View>
           )}
           <View style={styles.infoContainer}>
-            <EPGInfo 
-              tvgId={selectedChannel?.tvgId || null} 
-              channelName={channelName} 
+            <EPGInfo
+              tvgId={selectedChannel?.tvgId || null}
+              channelName={channelName}
             />
           </View>
           <View style={upcomingProgrammes && upcomingProgrammes.length > 0 ? styles.channelListWithUpcoming : styles.channelListWithoutUpcoming}>
@@ -244,8 +270,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#000",
-    height: Dimensions.get("window").height * 0.3, 
-    width: "100%", 
+    height: Dimensions.get("window").height * 0.4,
+    width: "100%",
   },
   placeholderText: {
     color: "#fff",
@@ -257,15 +283,15 @@ const styles = StyleSheet.create({
   videoContainer: {
     alignContent: "center",
     width: "100%",
-    height: Dimensions.get("window").height * 0.3, 
+    height: Dimensions.get("window").height * 0.4,
   },
   channelListWithUpcoming: {
     marginTop: 20,
-    paddingHorizontal: 10, 
+    paddingHorizontal: 10,
   },
   channelListWithoutUpcoming: {
     marginTop: 20,
-    paddingHorizontal: 10, 
+    paddingHorizontal: 10,
   },
 });
 

@@ -9,7 +9,7 @@ import { usePip } from '../../contexts/PipContext';
 import Toast from 'react-native-toast-message';
 import Icon from 'react-native-vector-icons/FontAwesome';
 
-const defaultLogo = require("../../assets/images/maskable.png"); 
+const defaultLogo = require("../../assets/images/maskable.png");
 
 const SearchScreen = () => {
     const { channels, loading, error, refetch } = useM3uParse();
@@ -134,7 +134,7 @@ const SearchScreen = () => {
                                     source={item.logo ? { uri: item.logo } : defaultLogo}
                                     style={styles.logo}
                                     resizeMode="contain"
-                                    defaultSource={defaultLogo} 
+                                    defaultSource={defaultLogo}
                                 />
                                 <Text style={styles.channelName}>{item.name}</Text>
                             </TouchableOpacity>

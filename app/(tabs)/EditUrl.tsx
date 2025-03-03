@@ -54,7 +54,6 @@ const EditUrl = () => {
         setSelectedUrl(url);
         setModalVisible(true);
     }, []);
-    // Request camera permissions
     useEffect(() => {
         const getCameraPermissions = async () => {
             const { status } = await Camera.requestCameraPermissionsAsync();
@@ -80,7 +79,7 @@ const EditUrl = () => {
                     await useM3uSaveActiveUrl(active);
                     refetch();
                 } else {
-                    // If no valid active URL, set the first default URL as active
+                   
                     const firstDefaultUrl = defaultUrls[0]?.url;
                     if (firstDefaultUrl) {
                         setActiveUrl(firstDefaultUrl);
@@ -98,7 +97,6 @@ const EditUrl = () => {
         loadActive();
     }, [loadActiveUrl, refetch, defaultUrls]);
 
-    // Auto-save activeUrl to AsyncStorage whenever it changes
     useEffect(() => {
         const saveActiveToStorage = async () => {
             try {
@@ -111,7 +109,6 @@ const EditUrl = () => {
         if (activeUrl) saveActiveToStorage();
     }, [activeUrl]);
 
-    // Fade-in animation effect
     useEffect(() => {
         Animated.timing(fadeAnim, {
             toValue: 1,
@@ -120,21 +117,19 @@ const EditUrl = () => {
         }).start();
     }, []);
 
-    // Interval to refetch data every 3 hours
     useEffect(() => {
         const intervalId = setInterval(refetch, 10800000);
         return () => clearInterval(intervalId);
     }, [refetch]);
 
-    // Validate URL format and verify M3U content
     const isValidUrl = async (url: string) => {
         const urlPattern = /^(https?:\/\/)[\w\-]+(\.[\w\-]+)+([\w\-\.,@?^=%&:/~+#]*[\w\-\@?^=%&/~+#])?$/;
         if (!urlPattern.test(url)) return false;
 
         try {
             const response = await axios.get(url, { 
-                timeout: 60000, // Increased to 60 seconds
-                maxContentLength: Infinity, // No size limit
+                timeout: 60000,
+                maxContentLength: Infinity, 
                 headers: {
                     'Accept': 'text/plain',
                     'User-Agent': 'Mozilla/5.0'
@@ -149,7 +144,6 @@ const EditUrl = () => {
         }
     };
 
-    // Save new URL to AsyncStorage
     const addUrl = async (url: string) => {
         try {
             const updatedUrls = [...userUrls, url];
@@ -161,7 +155,6 @@ const EditUrl = () => {
         }
     };
 
-    // Remove URL from AsyncStorage
     const deleteUrl = async (url: null) => {
         try {
             const updatedUrls = userUrls.filter((item) => item !== url);
@@ -172,13 +165,11 @@ const EditUrl = () => {
         }
     };
 
-    // Handle adding URL with validation
     const handleAddUrl = useCallback(async () => {
         const trimmedUrl = newUrl.trim();
         setIsProcessing(true);
         
         try {
-            // Clear database before adding new URL
             await AsyncStorage.removeItem('channelsData');
             
             const isValid = await isValidUrl(trimmedUrl);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect , useRef , useMemo} from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { View, Text, ScrollView, Image, TouchableOpacity, FlatList, Animated, Dimensions, RefreshControl, StyleSheet } from "react-native";
 import { useNavigation } from '@react-navigation/native';
 import Colors from "../../constants/Colors";
@@ -32,14 +32,14 @@ export default function Home() {
   const onRefresh = async () => {
     setRefreshing(true);
     try {
-    
+
       if (refetch) {
         await refetch();
       }
 
       if (filteredSports.length > 0) {
         setLimitedSports(getRandomChannels(filteredSports, 20));
-        setSlideshowData(filteredSports); 
+        setSlideshowData(filteredSports);
       } else {
         setLimitedSports([]);
         setSlideshowData([]);
@@ -83,8 +83,8 @@ export default function Home() {
   }, []);
 
   const filteredSports = useMemo(() => {
-    const sportsKeywords = ["sport", "sports", "olahraga", "bola", "liga", "UCL", "league", 
-      "champions", "cup", "ufc", "timnas" , "Volly" , "voli" , "basket", "pptv" ,"SPOTV",
+    const sportsKeywords = ["sport", "sports", "olahraga", "bola", "liga", "UCL", "league",
+      "champions", "cup", "ufc", "timnas", "Volly", "voli", "basket", "pptv", "SPOTV",
 
     ];
     return channels.filter((channel) =>
@@ -93,21 +93,21 @@ export default function Home() {
   }, [channels]);
 
   const filteredRadio = useMemo(() => {
-    const radioKeywords = ["radio", "radio indonesia", "pinoy radio", "malay radio", "rri radio" , "musik" , "music"];
+    const radioKeywords = ["radio", "radio indonesia", "pinoy radio", "malay radio", "rri radio", "musik", "music"];
     return channels.filter((channel) =>
       radioKeywords.some((keyword) => channel.group?.toLowerCase()?.includes(keyword))
     );
   }, [channels]);
 
   const filteredVOD = useMemo(() => {
-    const vodKeywords = [ "movies", "movie", "film", "films", "bioskop", "cinema",
+    const vodKeywords = ["movies", "movie", "film", "films", "bioskop", "cinema",
       "sinema", "vod", "video on demand", "box office",
       "action", "adventure", "comedy", "drama", "horror", "thriller",
       "romance", "documentary", "animation", "anime", "fantasy",
       "sci-fi", "mystery", "crime", "family", "musical",
       "series", "tv series", "drama series", "web series",
       "season", "episode", "show", "tv show", "reality show",
-      "netflix", "disney", "prime", "hbo", "hulu", "apple tv", "komedi", "lk21", "ftv", 
+      "netflix", "disney", "prime", "hbo", "hulu", "apple tv", "komedi", "lk21", "ftv",
       "hiburan", "hiburan", "entertainment", "entertainment", "tv show", "tv series", "tv series",];
     return channels.filter((channel) =>
       vodKeywords.some((keyword) => channel.group?.toLowerCase()?.includes(keyword))
@@ -293,58 +293,58 @@ export default function Home() {
 
       <Text style={styles.sectionTitle}>Rekomendasi Untuk Anda</Text>
       <FlatList
-  data={recommendations}
-  horizontal
-  showsHorizontalScrollIndicator={false}
-  keyExtractor={(item, index) => `${item.url || item.tvgId || item.name}-${index}`}
-  renderItem={({ item }) => (
-    !item || !item.name ? null : (
-      <TouchableOpacity
-        style={styles.card}
-        onPress={() => {
-          setPipMode(false); // Set PiP mode to normal
-          navigation.navigate('PlayerScreen', { url: item.url });
-        }}
-      >
-        <Image
-          source={item.logo ? { uri: item.logo } : tvBanner}
-          style={styles.cardImage}
-          onError={() => handleImageError(item.url)}
-          defaultSource={tvBanner}
-        />
-        <Text style={styles.cardText}>{truncate(item.name, 10)}</Text>
-      </TouchableOpacity>
-    )
-  )}
-/>
+        data={recommendations}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        keyExtractor={(item, index) => `${item.url || item.tvgId || item.name}-${index}`}
+        renderItem={({ item }) => (
+          !item || !item.name ? null : (
+            <TouchableOpacity
+              style={styles.card}
+              onPress={() => {
+                setPipMode(false); // Set PiP mode to normal
+                navigation.navigate('PlayerScreen', { url: item.url });
+              }}
+            >
+              <Image
+                source={item.logo ? { uri: item.logo } : tvBanner}
+                style={styles.cardImage}
+                onError={() => handleImageError(item.url)}
+                defaultSource={tvBanner}
+              />
+              <Text style={styles.cardText}>{truncate(item.name, 10)}</Text>
+            </TouchableOpacity>
+          )
+        )}
+      />
 
 
       <Text style={styles.sectionTitle}>Radio Player</Text>
       <FlatList
-  data={limitedRadio}
-  horizontal
-  showsHorizontalScrollIndicator={false}
-  keyExtractor={(item) => item.url}
-  renderItem={({ item }) => (
-    !item || !item.name ? null : (
-      <TouchableOpacity
-        style={styles.card}
-        onPress={() => {
-          setPipMode(false);
-          navigation.navigate('PlayerScreen', { url: item.url });
-        }}
-      >
-        <Image
-          source={item.logo ? { uri: item.logo } : tvBanner}
-          style={styles.cardImage}
-          onError={() => handleImageError(item.url)}
-          defaultSource={tvBanner}
-        />
-        <Text style={styles.cardText}>{truncate(item.name, 10)}</Text>
-      </TouchableOpacity>
-    )
-  )}
-/>
+        data={limitedRadio}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        keyExtractor={(item) => item.url}
+        renderItem={({ item }) => (
+          !item || !item.name ? null : (
+            <TouchableOpacity
+              style={styles.card}
+              onPress={() => {
+                setPipMode(false);
+                navigation.navigate('PlayerScreen', { url: item.url });
+              }}
+            >
+              <Image
+                source={item.logo ? { uri: item.logo } : tvBanner}
+                style={styles.cardImage}
+                onError={() => handleImageError(item.url)}
+                defaultSource={tvBanner}
+              />
+              <Text style={styles.cardText}>{truncate(item.name, 10)}</Text>
+            </TouchableOpacity>
+          )
+        )}
+      />
     </Animated.ScrollView>
   );
 }
@@ -388,136 +388,136 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     padding: 15,
     borderRadius: 10,
-    flex:1,
-    marginHorizontal:5,
-    alignItems:'center'
-},
-navtext: {
-  fontSize: 18,
-  fontWeight: '700',
-},
-skeletonNavButton:{
-backgroundColor:'#555',
-padding:15,
-borderRadius:10,
-flex:1,
-marginHorizontal:5,
-height:50,
-opacity:.7
+    flex: 1,
+    marginHorizontal: 5,
+    alignItems: 'center'
+  },
+  navtext: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  skeletonNavButton: {
+    backgroundColor: '#555',
+    padding: 15,
+    borderRadius: 10,
+    flex: 1,
+    marginHorizontal: 5,
+    height: 50,
+    opacity: .7
 
-},
-sectionTitle:{
-color:'#fff',
-fontSize:20,
-fontWeight:'700',
-marginBottom:20,
+  },
+  sectionTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 20,
 
-},
-skeletonSlide:{
-width:(width -32),
-height:(180),
-borderRadius:(10),
-backgroundColor:'#555',
-marginRight:(16),
-marginBottom:(20),
+  },
+  skeletonSlide: {
+    width: (width - 32),
+    height: (180),
+    borderRadius: (10),
+    backgroundColor: '#555',
+    marginRight: (16),
+    marginBottom: (20),
 
-},
-skeletonCardContainer:{
-alignItems:'center',
-marginRight:(15),
-marginBottom:(15),
+  },
+  skeletonCardContainer: {
+    alignItems: 'center',
+    marginRight: (15),
+    marginBottom: (15),
 
-},
-skeletonText:{
-width:(80),
-height:(12),
-backgroundColor:'#555',
-borderRadius:(5),
-marginTop:(8),
+  },
+  skeletonText: {
+    width: (80),
+    height: (12),
+    backgroundColor: '#555',
+    borderRadius: (5),
+    marginTop: (8),
 
-},
-card:{
-backgroundColor:'#222',
-padding:(10),
-borderRadius:(10),
-marginRight:(15),
-width:(120),
-alignItems:'center',
-marginBottom:(20),
+  },
+  card: {
+    backgroundColor: '#222',
+    padding: (10),
+    borderRadius: (10),
+    marginRight: (15),
+    width: (120),
+    alignItems: 'center',
+    marginBottom: (20),
 
-},
-skeletonCard:{
-backgroundColor:'#555',
-width:(120),
-height:(100),
-borderRadius:(10),
-marginRight:(15),
-marginBottom:(15),
+  },
+  skeletonCard: {
+    backgroundColor: '#555',
+    width: (120),
+    height: (100),
+    borderRadius: (10),
+    marginRight: (15),
+    marginBottom: (15),
 
-},
-cardImage:{
-width:(110),
-height:(90),
-borderRadius:(10),
-marginBottom:(5),
+  },
+  cardImage: {
+    width: (110),
+    height: (90),
+    borderRadius: (10),
+    marginBottom: (5),
 
-},
-cardText:{
-color:'#fff',
-fontSize:(13),
-textAlign:'center',
+  },
+  cardText: {
+    color: '#fff',
+    fontSize: (13),
+    textAlign: 'center',
 
-},
-slideshowContainer:{
-marginVertical:(10),
+  },
+  slideshowContainer: {
+    marginVertical: (10),
 
-},
-slide:{
-width:(width-32),
-height:(180),
-borderRadius:(10),
-overflow:'hidden',
-marginRight:(16),
-backgroundColor:'#333',
+  },
+  slide: {
+    width: (width - 32),
+    height: (180),
+    borderRadius: (10),
+    overflow: 'hidden',
+    marginRight: (16),
+    backgroundColor: '#333',
 
-},
-slideImage:{
-width:'100%',
-height:(120),
-resizeMode:'cover',
+  },
+  slideImage: {
+    width: '100%',
+    height: (120),
+    resizeMode: 'cover',
 
-},
-slideText:{
-color:'#fff',
-fontSize:(16),
-fontWeight:'bold',
-marginTop:(8),
-paddingHorizontal:(8),
+  },
+  slideText: {
+    color: '#fff',
+    fontSize: (16),
+    fontWeight: 'bold',
+    marginTop: (8),
+    paddingHorizontal: (8),
 
-},
-dotContainer:{
-flexDirection:'row',
-justifyContent:'center',
-alignItems:'center',
+  },
+  dotContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
 
-},
-dot:{
-width:(10),
-height:(10),
-borderRadius:(10/2),
-backgroundColor:'#ccc',
-marginHorizontal:(5),
+  },
+  dot: {
+    width: (10),
+    height: (10),
+    borderRadius: (10 / 2),
+    backgroundColor: '#ccc',
+    marginHorizontal: (5),
 
-},
-inactiveDot:{
-backgroundColor:'#888',
+  },
+  inactiveDot: {
+    backgroundColor: '#888',
 
-},
-activeDot:{
-width:(15),
-borderRadius:(15/2),
-backgroundColor:'#0220b8',
+  },
+  activeDot: {
+    width: (15),
+    borderRadius: (15 / 2),
+    backgroundColor: '#0220b8',
 
-}
+  }
 
 });

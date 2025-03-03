@@ -41,13 +41,11 @@ const useM3uParse = () => {
     const [userUrls, setUserUrls] = useState<string[]>([]);
     const [defaultUrls, setDefaultUrls] = useState<Array<{ url: string; enabled: boolean }>>(DEFAULT_M3U_URLS);
 
-    // Validate URL format
     const isValidUrl = useCallback((url: string) => {
         const urlPattern = /^(https?:\/\/)[\w\-]+(\.[\w\-]+)+([\/\w\-\.]*)*\/?$/;
         return urlPattern.test(url);
     }, []);
 
-    // Fetch M3U data from the active URL
     const fetchM3u = useCallback(async () => {
         setIsFetching(true);
         setError(null);
@@ -145,7 +143,6 @@ const useM3uParse = () => {
         }
     }, [isValidUrl]);
 
-    // Add a new URL to the user URLs list
     const addUrl = useCallback(
         async (newUrl: string) => {
             if (newUrl.trim() === "" || userUrls.includes(newUrl.trim())) return;
@@ -163,7 +160,6 @@ const useM3uParse = () => {
         [userUrls]
     );
 
-    // Delete a URL from the user URLs list
     const deleteUrl = useCallback(
         async (urlToDelete: string) => {
             const updatedUrls = userUrls.filter(url => url !== urlToDelete);
@@ -183,7 +179,6 @@ const useM3uParse = () => {
         [userUrls, refetch]
     );
 
-    // Save the active URL
     const saveActiveUrl = useCallback(async (url: string) => {
         try {
             await AsyncStorage.setItem(ACTIVE_URL_KEY, url);
@@ -193,7 +188,6 @@ const useM3uParse = () => {
         }
     }, [refetch]);
 
-    // Load the active URL
     const loadActiveUrl = useCallback(async () => {
         try {
             const activeUrl = await AsyncStorage.getItem(ACTIVE_URL_KEY);
@@ -204,7 +198,6 @@ const useM3uParse = () => {
         }
     }, []);
 
-    // Search channels by name
     const searchChannels = useCallback(
         (query: string) => {
             if (!query) return channels;
@@ -213,12 +206,10 @@ const useM3uParse = () => {
         [channels]
     );
 
-    // Refetch M3U data
     const refetch = useCallback(() => {
         fetchM3u();
     }, [fetchM3u]);
 
-    // Fetch M3U data on mount
     useEffect(() => {
         fetchM3u();
     }, [fetchM3u]);
