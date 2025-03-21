@@ -15,7 +15,6 @@ import {
 } from "react-native";
 import Modal from "react-native-modal";
 import Icon from "react-native-vector-icons/FontAwesome";
-import { Camera, CameraView } from "expo-camera";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -23,7 +22,6 @@ import useM3uParse from "../../hooks/M3uParse";
 import { useFocusEffect } from '@react-navigation/native';
 import axios from 'axios';
 import Toast from "react-native-toast-message";
-
 
 const EditUrl = () => {
     const {
@@ -43,23 +41,14 @@ const EditUrl = () => {
     const [activeUrl, setActiveUrl] = useState("");
     const [modalVisible, setModalVisible] = useState(false);
     const [selectedUrl, setSelectedUrl] = useState(null);
-    const [isScannerVisible, setScannerVisible] = useState(false);
-    const [hasPermission, setHasPermission] = useState(null);
-    const [scanned, setScanned] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const insets = useSafeAreaInsets();
     const [fadeAnim] = useState(new Animated.Value(0));
     const navigation = useNavigation();
+
     const handleDeleteUrl = useCallback((url: string) => {
         setSelectedUrl(url);
         setModalVisible(true);
-    }, []);
-    useEffect(() => {
-        const getCameraPermissions = async () => {
-            const { status } = await Camera.requestCameraPermissionsAsync();
-            setHasPermission(status === "granted");
-        };
-        getCameraPermissions();
     }, []);
 
     useFocusEffect(
@@ -79,7 +68,6 @@ const EditUrl = () => {
                     await useM3uSaveActiveUrl(active);
                     refetch();
                 } else {
-                   
                     const firstDefaultUrl = defaultUrls[0]?.url;
                     if (firstDefaultUrl) {
                         setActiveUrl(firstDefaultUrl);
@@ -244,30 +232,13 @@ const EditUrl = () => {
             }
         }
     }, [activeUrl, refetch, useM3uSaveActiveUrl]);
-    // Handle pull-to-refresh functionality
+    
     const onRefresh = async () => {
         setRefreshing(true);
         await new Promise((resolve) => setTimeout(resolve, 1000));
         setRefreshing(false);
     };
 
-    // Handle barcode scanning result
-    const handleBarcodeScanned = async ({ data }) => {
-        setScanned(true);
-        try {
-            const isValid = await isValidUrl(data);
-            if (isValid) {
-                setNewUrl(data);
-                setScannerVisible(false);
-                handleAddUrl();
-            } else {
-                Alert.alert("Invalid URL", "The QR code does not contain a valid M3U playlist URL.");
-            }
-        } catch (error) {
-            console.error("QR code validation error:", error);
-            Alert.alert("Error", "Failed to validate QR code URL");
-        }
-    };
     const combinedUrls = useMemo(() => {
         return [
             ...defaultUrls.map((item: { url: string }, index: number) => ({
@@ -332,14 +303,6 @@ const EditUrl = () => {
                     ) : (
                         <Icon name="plus" size={16} color="white" />
                     )}
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    style={[styles.actionButton, styles.scanButton]}
-                    onPress={() => setScannerVisible(true)}
-                    accessibilityLabel="Scan QR Code"
-                >
-                    <Icon name="qrcode" size={16} color="white" />
                 </TouchableOpacity>
             </View>
 
@@ -421,43 +384,7 @@ const EditUrl = () => {
                 </View>
             </Modal>
 
-            {/* Scanner modal */}
-            <Modal isVisible={isScannerVisible} onBackdropPress={() => setScannerVisible(false)}>
-                <View style={styles.scannerContainer}>
-                    {hasPermission === null ? (
-                        <Text style={styles.scannerText}>Requesting camera permissions...</Text>
-                    ) : hasPermission === false ? (
-                        <Text style={styles.scannerText}>No access to camera</Text>
-                    ) : (
-                        <CameraView
-                            style={StyleSheet.absoluteFillObject}
-                            onBarcodeScanned={scanned ? undefined : handleBarcodeScanned}
-                            barcodeScannerSettings={{
-                                barcodeTypes: ["qr"],
-                            }}
-                        />
-                    )}
-                    <TouchableOpacity 
-                        onPress={() => {
-                            setScannerVisible(false);
-                            setScanned(false);
-                        }}
-                        style={styles.closeButton}
-                    >
-                        <Icon name="times" size={15} color="white" />
-                    </TouchableOpacity>
-
-                    {scanned && (
-                        <TouchableOpacity
-                            style={styles.rescanButton}
-                            onPress={() => setScanned(false)}
-                        >
-                            <Icon name="refresh" size={15} color="white" />
-                        </TouchableOpacity>
-                    )}
-                </View>
-            </Modal>
-         <Toast />
+            <Toast />
         </Animated.View>
     );
 };
@@ -522,10 +449,6 @@ const styles = StyleSheet.create({
     },
     addButton: {
         backgroundColor: '#4CAF50',
-    },
-    scanButton: {
-        backgroundColor: '#2A2A2A',
-        marginLeft: 8,
     },
     listContainer: {
         padding: 16,
@@ -606,30 +529,6 @@ const styles = StyleSheet.create({
         marginHorizontal: 16,
         marginTop: 8,
     },
-    scannerContainer: {
-        height: 400,
-        borderRadius: 12,
-        overflow: 'hidden',
-        backgroundColor: '#1E1E1E',
-        borderWidth: 1,
-        borderColor: '#2A2A2A',
-    },
-    closeButton: {
-        position: 'absolute',
-        top: 16,
-        right: 16,
-        backgroundColor: '#2A2A2A',
-        padding: 10,
-        borderRadius: 20,
-        zIndex: 1,
-    },
-    rescanButton: {
-        position: 'absolute',
-        bottom: 16,
-        alignSelf: 'center',
-        backgroundColor: '#4CAF50',
-        padding: 10,
-        borderRadius: 20,
-    },
 });
+
 export default EditUrl;

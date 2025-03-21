@@ -11,7 +11,6 @@ import {
     SafeAreaView,
     Modal,
     TextInput,
-    Alert,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
@@ -19,7 +18,6 @@ import { watchHistoryEvent } from "./PlayerScreen";
 import { useNavigation } from "@react-navigation/native";
 import { launchImageLibrary } from 'react-native-image-picker';
 import { userUpdateEmitter } from './DrawerNavigator';
-import { usePip } from '../../contexts/PipContext';
 import LottieView from 'lottie-react-native';
 import loadingAnimation from '../../assets/animations/loading.json';
 
@@ -98,7 +96,6 @@ const HistoryTitle = () => {
 
 const ProfileScreen = () => {
     const navigation = useNavigation();
-    const { setPipMode } = usePip();
 
     const [avatarError, setAvatarError] = useState(false);
     const [watchHistory, setWatchHistory] = useState([]);
@@ -243,7 +240,6 @@ const ProfileScreen = () => {
             console.warn("URL video tidak ditemukan untuk item riwayat:", item);
             return;
         }
-        setPipMode(false); 
         navigation.navigate('PlayerScreen', {
             url: item.url,
             name: item.name,

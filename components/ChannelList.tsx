@@ -12,7 +12,6 @@ import {
 import { useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from 'expo-blur';
-import { usePip } from '../contexts/PipContext';
 
 interface Channel {
   name: string;
@@ -101,13 +100,10 @@ const ChannelList: React.FC<ChannelListProps> = ({
   const { width } = useWindowDimensions();
   const navigation = useNavigation();
   const [recommendedChannels, setRecommendedChannels] = useState<Channel[]>([]);
-  const { isInPipMode, exitPip } = usePip();
 
   useEffect(() => {
-
     const currentChannel = channels.find(channel => channel.url === currentChannelUrl);
     if (currentChannel && currentChannel.group) {
-
       const filteredChannels = channels.filter(channel => channel.group === currentChannel.group && channel.url !== currentChannelUrl);
       const shuffledChannels = shuffleArray(filteredChannels).slice(0, 10); 
       setRecommendedChannels(shuffledChannels);
@@ -120,16 +116,12 @@ const ChannelList: React.FC<ChannelListProps> = ({
     const selectedChannel = channels.find(c => c.url === channelUrl);
     if (!selectedChannel) return;
 
-    if (isInPipMode) {
-      exitPip();
-    }
-    
     if (onChannelSelect) {
       onChannelSelect(selectedChannel);
     } else {
       navigation.navigate("PlayerScreen", { url: channelUrl });
     }
-  }, [channels, isInPipMode, exitPip, onChannelSelect, navigation]);
+  }, [channels, onChannelSelect, navigation]);
 
   const cardWidth = width <= 360 ? 120 : width <= 480 ? 140 : 160;
 
@@ -286,7 +278,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: '#4CAF50',
   },
-
 });
 
 export default ChannelList;

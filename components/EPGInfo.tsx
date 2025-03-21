@@ -259,7 +259,7 @@ const EPGInfo: React.FC<EPGInfoProps> = ({ tvgId, channelName }) => {
         return (
             <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#e3c800" />
-                <Text style={styles.loadingText}>Memuat data EPG...</Text>
+                <Text style={styles.loadingText}>Memuat data EPG... Tunggu sampai selesai dulu</Text>
                 {lastUpdated && (
                     <Text style={styles.lastUpdatedText}>
                         Terakhir diperbarui: {lastUpdated.toLocaleTimeString()}

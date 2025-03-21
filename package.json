@@ -85,7 +85,7 @@
   },
   "private": true,
   "name": "smart_tv",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "main": "expo-router/entry",
   "android": {
     "package": "com.chesko25.smarttv"

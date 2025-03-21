@@ -5,7 +5,6 @@ import {
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import useM3uParse from "../../hooks/M3uParse";
-import { usePip } from '../../contexts/PipContext';
 import Toast from 'react-native-toast-message';
 import Icon from 'react-native-vector-icons/FontAwesome';
 
@@ -17,7 +16,6 @@ const SearchScreen = () => {
     const [searchPressed, setSearchPressed] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const navigation = useNavigation();
-    const { setPipMode } = usePip();
 
     const allChannels = channels || [];
 
@@ -122,7 +120,6 @@ const SearchScreen = () => {
                             <TouchableOpacity
                                 style={styles.channelItem}
                                 onPress={() => {
-                                    setPipMode(false);
                                     if (item.url) {
                                         navigation.navigate("Home", { screen: "PlayerScreen", params: { url: item.url } });
                                     } else {

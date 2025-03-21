@@ -7,40 +7,23 @@ import {
   StatusBar,
   useWindowDimensions,
   SafeAreaView,
-  Dimensions,
   ScrollView,
   RefreshControl,
   BackHandler,
-  Platform,
 } from "react-native";
-import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import { useNavigation } from "@react-navigation/native";
 import useM3uParse from "../../hooks/M3uParse";
 import { EventEmitter } from "expo-modules-core";
 import Toast from "react-native-toast-message";
 import VideoPlayer from "../../components/VideoPlayer";
 import EPGInfo from "../../components/EPGInfo";
 import ChannelList from "../../components/ChannelList";
-import { usePip } from '../../contexts/PipContext';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import default_logo from "../../assets/images/tv_banner.png";
 
-
 export const watchHistoryEvent = new EventEmitter();
 
-interface PlayerScreenProps {
-  route: {
-    params?: {
-      url?: string;
-    };
-  };
-}
-
-interface VideoDimensions {
-  width: number;
-  height: number;
-}
-
-const PlayerScreen: React.FC<PlayerScreenProps> = ({ route }) => {
+const PlayerScreen = ({ route }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const { url } = route.params || {};
   const { channels, refetch, upcomingProgrammes } = useM3uParse();
@@ -50,31 +33,10 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ route }) => {
   const channelName = selectedChannel?.name || "Unknown Channel";
 
   const [isPlaying, setIsPlaying] = useState(!!url);
-  const [videoDimensions, setVideoDimensions] = useState<VideoDimensions>({
-    width: width,
-    height: Dimensions.get("window").height * 0.4,
-  });
   const [refreshing, setRefreshing] = useState(false);
-  const { setPipMode } = usePip();
-  const [isInPipMode, setIsInPipMode] = useState(false);
-
-  const updateVideoDimensions = useCallback(() => {
-    setVideoDimensions({
-      width,
-      height: Dimensions.get("window").height * 0.4,
-    });
-  }, [width]);
-
-  useEffect(() => {
-    updateVideoDimensions();
-  }, [updateVideoDimensions]);
 
   useEffect(() => {
     const handleBackPress = () => {
-      if (isInPipMode) {
-        handlePipModeChange(false);
-        return true;
-      }
       return false;
     };
 
@@ -82,7 +44,7 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ route }) => {
     return () => {
       BackHandler.removeEventListener("hardwareBackPress", handleBackPress);
     };
-  }, [isInPipMode]);
+  }, []);
 
   useEffect(() => {
     const lockOrientation = async () => {
@@ -96,16 +58,13 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ route }) => {
     };
   }, []);
 
-
   useEffect(() => {
     const unsubscribeFocus = navigation.addListener('focus', () => {
-      if (!isInPipMode) {
-        setIsPlaying(true);
-      }
+      setIsPlaying(true);
     });
 
     return unsubscribeFocus;
-  }, [navigation, isInPipMode]);
+  }, [navigation]);
 
   useEffect(() => {
     const unsubscribeBlur = navigation.addListener('blur', () => {
@@ -124,7 +83,7 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ route }) => {
     saveWatchHistory(url, channelName);
   }, [url, channelName]);
 
-  const handleBuffer = useCallback(({ isBuffering }: { isBuffering: boolean }) => {
+  const handleBuffer = useCallback(({ isBuffering }) => {
     setIsPlaying(!isBuffering);
   }, []);
 
@@ -138,8 +97,7 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ route }) => {
       visibilityTime: 4000,
       autoHide: true,
     });
-    handleRefresh();
-  }, [handleRefresh]);
+  }, []);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -157,20 +115,7 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ route }) => {
     }
   }, [refetch]);
 
-  const handlePipModeChange = useCallback((isInPipMode: boolean) => {
-    console.log("PiP mode changed:", isInPipMode);
-    setIsInPipMode(isInPipMode);
-    setPipMode(isInPipMode, url, selectedChannel);
-    setIsPlaying(!isInPipMode);
-
-    if (Platform.OS === 'android') {
-      // Additional Android-specific PiP logic
-    } else if (Platform.OS === 'ios') {
-      // Additional iOS-specific PiP logic
-    }
-  }, [url, selectedChannel, setPipMode]);
-
-  const saveWatchHistory = useCallback(async (videoUrl: string, channelName: string) => {
+  const saveWatchHistory = useCallback(async (videoUrl, channelName) => {
     try {
       const existingHistory = await AsyncStorage.getItem('watchHistory');
       const history = existingHistory ? JSON.parse(existingHistory) : [];
@@ -178,12 +123,13 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ route }) => {
         url: videoUrl,
         name: channelName,
         timestamp: Date.now(),
-        logo: selectedChannel?.logo || "default_logo"
+        logo: selectedChannel?.logo || default_logo,
       };
 
       const updatedHistory = [newEntry, ...history].filter((item, index, self) =>
         index === self.findIndex(t => t.url === item.url)
       );
+
       const limitedHistory = updatedHistory.slice(0, 20);
       await AsyncStorage.setItem('watchHistory', JSON.stringify(limitedHistory));
       watchHistoryEvent.emit("historyUpdated");
@@ -200,7 +146,6 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ route }) => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar hidden={true} />
-
       <ScrollView
         contentContainerStyle={styles.scrollViewContent}
         bounces={true}
@@ -210,24 +155,24 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ route }) => {
       >
         <View style={styles.contentContainer}>
           {url ? (
-            <View style={[styles.videoContainer, videoDimensions]}>
+            <View style={[styles.videoContainer, { height: isFullscreen ? '100%' : '35%', width , alignSelf: "center"}]}>
               <VideoPlayer
-                key={url} 
+                key={url}
                 url={url}
                 channel={selectedChannel}
                 onError={handleError}
                 paused={!isPlaying}
-                style={{ height: "100%", width: "100%" }}
+                isFullscreen={isFullscreen}
+                onFullscreenChange={setIsFullscreen}
+                style={{ height: "100%", width: "100%" , alignSelf: "center" }}
                 onRefresh={handleRefresh}
-                onPipModeChange={handlePipModeChange}
-                isPipEnabled={true}
                 onLoadStart={handleLoadStart}
                 onLoad={handleLoad}
                 onBuffer={handleBuffer}
               />
             </View>
           ) : (
-            <View style={[styles.videoPlaceholder, videoDimensions]}>
+            <View style={[styles.videoPlaceholder, { height: '35%', width }]}>
               <Text style={styles.placeholderText}>Select a Channel to Watch</Text>
             </View>
           )}
@@ -251,8 +196,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#121212",
-    justifyContent: "flex-start",
-    alignItems: "stretch",
+  
   },
   scrollViewContent: {
     flexGrow: 1,
@@ -270,7 +214,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#000",
-    height: Dimensions.get("window").height * 0.4,
     width: "100%",
   },
   placeholderText: {
@@ -283,7 +226,6 @@ const styles = StyleSheet.create({
   videoContainer: {
     alignContent: "center",
     width: "100%",
-    height: Dimensions.get("window").height * 0.4,
   },
   channelListWithUpcoming: {
     marginTop: 20,

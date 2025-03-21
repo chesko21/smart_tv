@@ -6,7 +6,6 @@ import {
   OnLoadData,
   OnBufferData,
   OnError as OnErrorData,
-  OnPictureInPictureStatusChangedData,
 } from "react-native-video";
 import { urlChangeEmitter } from "../utils/events";
 import {
@@ -14,13 +13,10 @@ import {
   ActivityIndicator,
   Text,
   StyleSheet,
-  useWindowDimensions,
   RefreshControl,
   ScrollView,
   TouchableOpacity,
   Modal,
-  Platform,
-  AppState,
   StatusBar,
   ViewStyle,
 } from "react-native";
@@ -61,8 +57,8 @@ interface VideoPlayerProps {
   style?: ViewStyle;
   maxHeight?: number;
   onRefresh?: () => void;
-  onPipModeChange?: (isInPipMode: boolean) => void;
-  isPipEnabled?: boolean;
+  isFullscreen: boolean;               
+  onFullscreenChange: (isFullscreen: boolean) => void;
 }
 
 const configureDrm = (channel: Channel | null, streamConfig: StreamConfig): DrmConfig => {
@@ -75,9 +71,6 @@ const configureDrm = (channel: Channel | null, streamConfig: StreamConfig): DrmC
     return {
       type: VideoDRMType.WIDEVINE,
       licenseServer: 'https://mrpw.ptmnc01.verspective.net/?deviceId=MDA5MmI1NjctOWMyMS0zNDYyLTk0NDAtODM5NGQ1ZjdlZWRi',
-      keys: {
-        key: '88f6c7cbd793374cb5f12d7e26dcd63b'
-      },
       headers: {
         'User-Agent': channel.userAgent,
         'Referer': channel.referrer || '',
@@ -102,7 +95,6 @@ const detectStreamType = (url: string): StreamConfig => {
 };
 
 const VideoPlayer: React.FC<VideoPlayerProps> = ({
-  onPipModeChange,
   paused,
   url,
   channel,
@@ -113,35 +105,31 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   style,
   maxHeight,
   onRefresh,
+  isFullscreen, 
+  onFullscreenChange, 
 }) => {
-  const playerRef = useRef < VideoProperties > (null);
-  const { width, height } = useWindowDimensions();
+  const playerRef = useRef<VideoProperties>(null);
   const insets = useSafeAreaInsets();
 
   const [loading, setLoading] = useState(true);
   const [buffering, setBuffering] = useState(false);
   const [error, setError] = useState(false);
   const [showControls, setShowControls] = useState(true);
-  const [videoTracks, setVideoTracks] = useState < any[] > ([]);
-  const [selectedTrack, setSelectedTrack] = useState < number | null > (null);
+  const [videoTracks, setVideoTracks] = useState<any[]>([]);
+  const [selectedTrack, setSelectedTrack] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [showResolutionModal, setShowResolutionModal] = useState(false);
   const [isPlaying, setIsPlaying] = useState(true);
   const [showQualityButton, setShowQualityButton] = useState(true);
-  const [availableResolutions, setAvailableResolutions] = useState < number[] > ([]);
-  const [selectedResolution, setSelectedResolution] = useState < number | null > (null);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isInPipMode, setIsInPipMode] = useState(false);
-  const [isPlayerVisible, setIsPlayerVisible] = useState(true);
+  const [availableResolutions, setAvailableResolutions] = useState<number[]>([]);
+  const [selectedResolution, setSelectedResolution] = useState<number | null>(null);
 
-  const [playbackPosition, setPlaybackPosition] = useState(0);
-
-  const controlsTimeoutRef = useRef < NodeJS.Timeout | null > (null);
-  const qualityButtonTimeoutRef = useRef < NodeJS.Timeout | null > (null);
+  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const qualityButtonTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const streamConfig = useMemo(() => detectStreamType(url), [url]);
   const drmConfig = useMemo(() => configureDrm(channel, streamConfig), [channel, streamConfig]);
-  const videoHeight = useMemo(() => maxHeight ? Math.min(maxHeight, height * 0.4) : height * 0.4, [maxHeight, height]);
+  const videoHeight = useMemo(() => maxHeight ? Math.min(maxHeight, 100) : 100, [maxHeight]);
 
   const handleLoadStart = useCallback(() => {
     setLoading(true);
@@ -195,7 +183,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     setLoading(true);
     try {
       await new Promise(resolve => setTimeout(resolve, 1000));
-      drmConfig(configureDrm(channel, streamConfig));
       if (playerRef.current) {
         playerRef.current.reload();
       }
@@ -205,14 +192,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
       onRefresh?.();
     }
   }, [channel, streamConfig, onRefresh]);
-
-  const toggleControls = useCallback(() => {
-    setShowControls(prev => {
-      const newValue = !prev;
-      if (newValue) resetControlsAutoHideTimer();
-      return newValue;
-    });
-  }, []);
 
   const resetControlsAutoHideTimer = useCallback(() => {
     if (controlsTimeoutRef.current) {
@@ -257,58 +236,16 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const toggleFullscreen = useCallback(() => {
     if (playerRef.current) {
       if (!isFullscreen) {
-        ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE_RIGHT);
+        ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+        onFullscreenChange(true); 
+      } else {
+        ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT);
+        onFullscreenChange(false); 
       }
       playerRef.current.presentFullscreenPlayer();
     }
-  }, [isFullscreen]);
+  }, [isFullscreen, onFullscreenChange]);
 
-  const enterPipMode = useCallback(() => {
-    if (Platform.OS === 'android') {
-      setIsInPipMode(true);
-      setIsPlayerVisible(false);
-
-      setIsPlaying(false);
-      onPipModeChange?.(true);
-    }
-  }, [onPipModeChange]);
-
-  const exitPipMode = useCallback(() => {
-    console.log("Exiting PiP mode, setting isPlayerVisible to true");
-    setIsInPipMode(false);
-    setIsPlayerVisible(true);
-    playerRef.current?.seek(playbackPosition);
-    setIsPlaying(true);
-    onPipModeChange?.(false);
-  }, [onPipModeChange, playbackPosition]);
-
-  const handlePipModeChange = useCallback((isInPipMode: boolean) => {
-    console.log("PiP mode changed:", isInPipMode);
-    setIsInPipMode(isInPipMode);
-    onPipModeChange(isInPipMode);
-
-    if (Platform.OS === 'android') {
-      if (isInPipMode) {
-        if (playerRef.current) {
-          playerRef.current.presentFullscreenPlayer();
-        }
-      } else {
-        if (playerRef.current) {
-          playerRef.current.dismissFullscreenPlayer();
-        }
-      }
-    } else if (Platform.OS === 'ios') {
-      if (isInPipMode) {
-        if (playerRef.current) {
-          playerRef.current.presentFullscreenPlayer();
-        }
-      } else {
-        if (playerRef.current) {
-          playerRef.current.dismissFullscreenPlayer();
-        }
-      }
-    }
-  }, [onPipModeChange]);
   useEffect(() => {
     const handleUrlChange = () => {
       handleRefresh();
@@ -323,183 +260,152 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     };
   }, [handleRefresh]);
 
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', (nextAppState) => {
-      if (nextAppState === 'background' && !isInPipMode && playerRef.current) {
-        enterPipMode();
-      }
-    });
-
-    return () => {
-      subscription.remove();
-    };
-  }, [isInPipMode, enterPipMode]);
-
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
       {!isFullscreen && <StatusBar backgroundColor="#000" barStyle="light-content" />}
       <ScrollView
-        contentContainerStyle={[
-          styles.scrollViewContent,
-          isFullscreen && { width: '100%', height: '100%', margin: 0, padding: 0 },
-          { paddingTop: isFullscreen ? 0 : insets.top }
-        ]}
+        contentContainerStyle={styles.scrollViewContent}
         scrollEnabled={!isFullscreen}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >
-        {isPlayerVisible && (
-          <View style={[styles.videoContainer, { width: width, height: videoHeight, marginBottom: insets.bottom }, style, isFullscreen && { margin: 0, padding: 0 }]}>
-            <TouchableOpacity style={styles.touchableArea} activeOpacity={1} onPress={handleUserInteraction}>
-              <Video
-                ref={playerRef}
-                source={{
-                  uri: url,
-                  type: streamConfig.isHLS ? 'm3u8' : streamConfig.isDASH ? 'mpd' : undefined,
-                  drm: drmConfig.type ? drmConfig : undefined,
-                }}
-                style={[
-                  streamConfig.isRadio ? styles.audioPlayer : styles.video,
-                  isFullscreen && { width: '100%', height: '100%', backgroundColor: '#000' }
-                ]}
-                controls={false}
-                audioOnly={streamConfig.isRadio}
-                playInBackground={streamConfig.isRadio}
-                ignoreSilentSwitch={streamConfig.isRadio ? "ignore" : "obey"}
-                progressUpdateInterval={1000}
-                onError={handleError}
-                resizeMode={isFullscreen ? "contain" : "contain"}
-                onLoadStart={handleLoadStart}
-                onLoad={handleLoad}
-                onBuffer={handleBuffer}
-                paused={!isPlaying}
-                onFullscreenPlayerWillPresent={() => {
-                  setIsFullscreen(true);
-                  ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE_RIGHT);
-                }}
-                onFullscreenPlayerWillDismiss={() => {
-                  setIsFullscreen(false);
-                  ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-                }}
-                selectedVideoTrack={{ type: selectedResolution ? "resolution" : "auto", value: selectedResolution || undefined }}
-                pictureInPicture={true}
-                onPictureInPictureStatusChanged={handlePipModeChange}
-              />
-              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-            </TouchableOpacity>
+        <View style={[styles.videoContainer, { width: '100%', height: isFullscreen ? '100%' : videoHeight , alignSelf: "center" , alignContent: "center"}, style]}>
+          <TouchableOpacity style={styles.touchableArea} activeOpacity={1} onPress={handleUserInteraction}>
+            <Video
+              ref={playerRef}
+              source={{
+                uri: url,
+                type: streamConfig.isHLS ? 'm3u8' : streamConfig.isDASH ? 'mpd' : undefined,
+                drm: drmConfig.type ? drmConfig : undefined,
+              }}
+              style={[
+                streamConfig.isRadio ? styles.audioPlayer : styles.video,
+                { height: '100%', width: '100%' , alignSelf: "center", alignContent: "center"} 
+              ]}
+              controls={false}
+              progressUpdateInterval={1000}
+              onError={handleError}
+              resizeMode={isFullscreen ? "contain" : "contain"} 
+              onLoadStart={handleLoadStart}
+              onLoad={handleLoad}
+              onBuffer={handleBuffer}
+              paused={!isPlaying}
+              onFullscreenPlayerWillPresent={() => {
+                onFullscreenChange(true);
+                setShowControls(true);
+              }}
+              onFullscreenPlayerWillDismiss={() => {
+                onFullscreenChange(false);
+                setShowControls(false);
+                ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT);
+              }}
+              selectedVideoTrack={{ type: selectedResolution ? "resolution" : "auto", value: selectedResolution || undefined }}
+            />
 
+          </TouchableOpacity>
 
-            {showControls && (
-              <View style={styles.customControls}>
-                <TouchableOpacity onPress={togglePlay} style={styles.controlButton}>
-                  <Icon name={isPlaying ? "pause" : "play-arrow"} size={16} color="#FFF" />
+          {showControls && (
+            <View style={styles.customControls}>
+              <TouchableOpacity onPress={togglePlay} style={styles.controlButton}>
+                <Icon name={isPlaying ? "pause" : "play-arrow"} size={16} color="#FFF" />
+              </TouchableOpacity>
+
+              <View style={styles.rightControls}>
+                <TouchableOpacity onPress={() => {
+                  setShowResolutionModal(true);
+                  setShowQualityButton(true);
+                  resetQualityButtonTimer();
+                }}>
+                  <Icon name="settings" size={16} color="#FFF" style={styles.controlButton} />
                 </TouchableOpacity>
 
-                <View style={styles.rightControls}>
-                  {Platform.OS === 'android' && (
-                    <TouchableOpacity
-                      onPress={isInPipMode ? exitPipMode : enterPipMode}
-                      style={styles.controlButton}
-                    >
-                      <Icon name="picture-in-picture-alt" size={16} color="#FFF" />
-                    </TouchableOpacity>
-                  )}
-                  <TouchableOpacity onPress={() => {
-                    setShowResolutionModal(true);
-                    setShowQualityButton(true);
-                    resetQualityButtonTimer();
-                  }}>
-                    <Icon name="settings" size={16} color="#FFF" style={styles.controlButton} />
-                  </TouchableOpacity>
-
-                  <TouchableOpacity onPress={toggleFullscreen} style={styles.controlButton}>
-                    <Icon name={isFullscreen ? "fullscreen-exit" : "fullscreen"} size={16} color="#FFF" />
-                  </TouchableOpacity>
-                </View>
+                <TouchableOpacity onPress={toggleFullscreen} style={styles.controlButton}>
+                  <Icon name={isFullscreen ? "fullscreen-exit" : "fullscreen"} size={16} color="#FFF" />
+                </TouchableOpacity>
               </View>
-            )}
+            </View>
+          )}
 
-            {showResolutionModal && (
-              <Modal
-                visible={showResolutionModal}
-                transparent={true}
-                animationType="fade"
-                onRequestClose={() => {
+          {showResolutionModal && (
+            <Modal
+              visible={showResolutionModal}
+              transparent={true}
+              animationType="fade"
+              onRequestClose={() => {
+                setShowResolutionModal(false);
+                setShowQualityButton(true);
+                resetQualityButtonTimer();
+              }}
+            >
+              <TouchableOpacity
+                style={styles.modalOverlay}
+                activeOpacity={1}
+                onPress={() => {
                   setShowResolutionModal(false);
                   setShowQualityButton(true);
                   resetQualityButtonTimer();
                 }}
               >
-                <TouchableOpacity
-                  style={styles.modalOverlay}
-                  activeOpacity={1}
-                  onPress={() => {
-                    setShowResolutionModal(false);
-                    setShowQualityButton(true);
-                    resetQualityButtonTimer();
-                  }}
-                >
-                  <View style={styles.resolutionMenu}>
-                    <Text style={styles.menuTitle}>Quality</Text>
+                <View style={styles.resolutionMenu}>
+                  <Text style={styles.menuTitle}>Quality</Text>
 
+                  <TouchableOpacity
+                    style={[
+                      styles.resolutionMenuItem,
+                      !selectedResolution && styles.selectedMenuItem
+                    ]}
+                    onPress={() => handleResolutionSelect(0)}
+                  >
+                    <View style={styles.menuItemLeft}>
+                      {!selectedResolution && <Icon name="check" size={16} color="#FFF" />}
+                      <Text style={styles.resolutionText}>Auto</Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  {availableResolutions.map((resolution) => (
                     <TouchableOpacity
+                      key={resolution}
                       style={[
                         styles.resolutionMenuItem,
-                        !selectedResolution && styles.selectedMenuItem
+                        selectedResolution === resolution && styles.selectedMenuItem
                       ]}
-                      onPress={() => handleResolutionSelect(0)}
+                      onPress={() => handleResolutionSelect(resolution)}
                     >
                       <View style={styles.menuItemLeft}>
-                        {!selectedResolution && <Icon name="check" size={16} color="#FFF" />}
-                        <Text style={styles.resolutionText}>Auto</Text>
+                        {selectedResolution === resolution && <Icon name="check" size={16} color="#FFF" />}
+                        <Text style={styles.resolutionText}>{resolution}p</Text>
+                      </View>
+                      <View style={styles.qualityBadge}>
+                        <Text style={styles.qualityBadgeText}>
+                          {resolution >= 720 ? 'HD' : resolution >= 480 ? 'SD' : 'SD'}
+                        </Text>
                       </View>
                     </TouchableOpacity>
+                  ))}
+                </View>
+              </TouchableOpacity>
+            </Modal>
+          )}
 
-                    {availableResolutions.map((resolution) => (
-                      <TouchableOpacity
-                        key={resolution}
-                        style={[
-                          styles.resolutionMenuItem,
-                          selectedResolution === resolution && styles.selectedMenuItem
-                        ]}
-                        onPress={() => handleResolutionSelect(resolution)}
-                      >
-                        <View style={styles.menuItemLeft}>
-                          {selectedResolution === resolution && <Icon name="check" size={16} color="#FFF" />}
-                          <Text style={styles.resolutionText}>{resolution}p</Text>
-                        </View>
-                        <View style={styles.qualityBadge}>
-                          <Text style={styles.qualityBadgeText}>
-                            {resolution >= 720 ? 'HD' : resolution >= 480 ? 'SD' : 'SD'}
-                          </Text>
-                        </View>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </TouchableOpacity>
-              </Modal>
-            )}
+          {(loading || buffering) && (
+            <View style={styles.overlay}>
+              <ActivityIndicator size="large" color="#FFF" />
+              <Text style={styles.overlayText}>{loading ? "Memuat Video..." : "Buffering..."}</Text>
+            </View>
+          )}
 
-            {(loading || buffering) && (
-              <View style={styles.overlay}>
-                <ActivityIndicator size="large" color="#FFF" />
-                <Text style={styles.overlayText}>{loading ? "Memuat Video..." : "Buffering..."}</Text>
-              </View>
-            )}
-
-            {error && (
-              <View style={styles.overlay}>
-                <Text style={styles.errorText}>Gagal Memuat Video</Text>
-                <TouchableOpacity
-                  style={styles.reloadButton}
-                  onPress={handleRefresh}
-                >
-                  <Icon name="refresh" size={20} color="#FFF" />
-                  <Text style={styles.reloadText}>Muat Ulang</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-        )}
+          {error && (
+            <View style={styles.overlay}>
+              <Text style={styles.errorText}>Gagal Memuat Video</Text>
+              <TouchableOpacity
+                style={styles.reloadButton}
+                onPress={handleRefresh}
+              >
+                <Icon name="refresh" size={20} color="#FFF" />
+                <Text style={styles.reloadText}>Muat Ulang</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -508,20 +414,25 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
 const styles = StyleSheet.create({
   scrollViewContent: {
     flex: 1,
+    backgroundColor: "#121212",
+  
   },
   touchableArea: {
     width: "100%",
     height: "100%",
   },
+  videoContainer: {
+    flex: 1,
+    justifyContent: "center", 
+    alignItems: "center",
+    backgroundColor: "#000",
+  },
   video: {
     width: "100%",
-    height: "100%",
-    backgroundColor: '#000',
-  },
-  videoContainer: {
-    width: "100%",
-    height: "100%",
-    backgroundColor: "#000",
+    height: "100%", 
+    backgroundColor: '#000', 
+    alignSelf: "center",
+
   },
   overlay: {
     position: "absolute",

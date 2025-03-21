@@ -4,7 +4,6 @@ import { useNavigation } from '@react-navigation/native';
 import Colors from "../../constants/Colors";
 import useM3uParse from "../../hooks/M3uParse";
 import tvBanner from "../../assets/images/tv_banner.png";
-import { usePip } from '../../contexts/PipContext';
 
 const { width, height } = Dimensions.get("window");
 
@@ -16,23 +15,21 @@ const getRandomChannels = (channels: any, num = 10) => {
 export default function Home() {
   const { channels, loading, refetch } = useM3uParse();
   const [isLoading, setIsLoading] = useState(true);
-  const [errorImages, setErrorImages] = useState < { [key: string]: boolean } > ({});
+  const [errorImages, setErrorImages] = useState<{ [key: string]: boolean }>({});
   const [refreshing, setRefreshing] = useState(false);
   const navigation = useNavigation();
   const shimmerAnim = useRef(new Animated.Value(0)).current;
   const fadeInAnim = useRef(new Animated.Value(0)).current;
-  const [slideshowData, setSlideshowData] = useState < any[] > ([]);
+  const [slideshowData, setSlideshowData] = useState<any[]>([]);
   const [activeSlide, setActiveSlide] = useState(0);
-  const { setPipMode } = usePip();
 
-  const [limitedSports, setLimitedSports] = useState < any[] > ([]);
-  const [limitedRadio, setLimitedRadio] = useState < any[] > ([]);
-  const [recommendations, setRecommendations] = useState < any[] > ([]);
+  const [limitedSports, setLimitedSports] = useState<any[]>([]);
+  const [limitedRadio, setLimitedRadio] = useState<any[]>([]);
+  const [recommendations, setRecommendations] = useState<any[]>([]);
 
   const onRefresh = async () => {
     setRefreshing(true);
     try {
-
       if (refetch) {
         await refetch();
       }
@@ -54,8 +51,8 @@ export default function Home() {
       } else {
         setRecommendations([]);
       }
-
     } catch (error) {
+      console.error(error);
     } finally {
       setRefreshing(false);
     }
@@ -84,9 +81,7 @@ export default function Home() {
 
   const filteredSports = useMemo(() => {
     const sportsKeywords = ["sport", "sports", "olahraga", "bola", "liga", "UCL", "league",
-      "champions", "cup", "ufc", "timnas", "Volly", "voli", "basket", "pptv", "SPOTV",
-
-    ];
+      "champions", "cup", "ufc", "timnas", "Volly", "voli", "basket", "pptv", "SPOTV"];
     return channels.filter((channel) =>
       sportsKeywords.some((keyword) => channel.group?.toLowerCase()?.includes(keyword))
     );
@@ -108,7 +103,7 @@ export default function Home() {
       "series", "tv series", "drama series", "web series",
       "season", "episode", "show", "tv show", "reality show",
       "netflix", "disney", "prime", "hbo", "hulu", "apple tv", "komedi", "lk21", "ftv",
-      "hiburan", "hiburan", "entertainment", "entertainment", "tv show", "tv series", "tv series",];
+      "hiburan", "hiburan", "entertainment", "entertainment", "tv show", "tv series", "tv series"];
     return channels.filter((channel) =>
       vodKeywords.some((keyword) => channel.group?.toLowerCase()?.includes(keyword))
     );
@@ -127,11 +122,9 @@ export default function Home() {
     } else {
       setLimitedRadio([]);
     }
-
     if (channels && channels.length > 0) {
       setRecommendations(getRandomChannels(channels, 40));
     }
-
   }, [filteredSports, filteredRadio, channels]);
 
   useEffect(() => {
@@ -147,6 +140,7 @@ export default function Home() {
   const handleImageError = (url: string) => {
     setErrorImages((prev) => ({ ...prev, [url]: true }));
   };
+
   const renderSlideshowItem = ({ item }: { item: { url: string; logo?: string; name: string } }) => (
     <TouchableOpacity
       style={styles.slide}
@@ -189,9 +183,7 @@ export default function Home() {
     return (
       <ScrollView contentContainerStyle={containerStyle}>
         <Text style={styles.header}>Smart TV Streaming</Text>
-
         <Animated.View style={[styles.skeletonBanner, { opacity: shimmerAnim }]} />
-
         <View style={styles.navContainer}>
           <Animated.View style={[styles.skeletonNavButton, { opacity: shimmerAnim }]} />
           <Animated.View style={[styles.skeletonNavButton, { opacity: shimmerAnim }]} />
@@ -267,8 +259,8 @@ export default function Home() {
           </Text>
         </TouchableOpacity>
       </View>
-      <Text style={styles.sectionTitle}>Sport</Text>
 
+      <Text style={styles.sectionTitle}>Sport</Text>
       <FlatList
         data={slideshowData.slice(0, 5)}
         horizontal
@@ -302,7 +294,6 @@ export default function Home() {
             <TouchableOpacity
               style={styles.card}
               onPress={() => {
-                setPipMode(false); // Set PiP mode to normal
                 navigation.navigate('PlayerScreen', { url: item.url });
               }}
             >
@@ -318,7 +309,6 @@ export default function Home() {
         )}
       />
 
-
       <Text style={styles.sectionTitle}>Radio Player</Text>
       <FlatList
         data={limitedRadio}
@@ -330,7 +320,6 @@ export default function Home() {
             <TouchableOpacity
               style={styles.card}
               onPress={() => {
-                setPipMode(false);
                 navigation.navigate('PlayerScreen', { url: item.url });
               }}
             >
@@ -379,11 +368,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginVertical: 20,
   },
-  skeletonNavContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginVertical: 20,
-  },
   navButton: {
     backgroundColor: Colors.primary,
     padding: 15,
@@ -404,14 +388,12 @@ const styles = StyleSheet.create({
     marginHorizontal: 5,
     height: 50,
     opacity: .7
-
   },
   sectionTitle: {
     color: '#fff',
     fontSize: 20,
     fontWeight: '700',
     marginBottom: 20,
-
   },
   skeletonSlide: {
     width: (width - 32),
@@ -420,13 +402,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#555',
     marginRight: (16),
     marginBottom: (20),
-
   },
   skeletonCardContainer: {
     alignItems: 'center',
     marginRight: (15),
     marginBottom: (15),
-
   },
   skeletonText: {
     width: (80),
@@ -434,7 +414,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#555',
     borderRadius: (5),
     marginTop: (8),
-
   },
   card: {
     backgroundColor: '#222',
@@ -444,7 +423,6 @@ const styles = StyleSheet.create({
     width: (120),
     alignItems: 'center',
     marginBottom: (20),
-
   },
   skeletonCard: {
     backgroundColor: '#555',
@@ -453,24 +431,20 @@ const styles = StyleSheet.create({
     borderRadius: (10),
     marginRight: (15),
     marginBottom: (15),
-
   },
   cardImage: {
     width: (110),
     height: (90),
     borderRadius: (10),
     marginBottom: (5),
-
   },
   cardText: {
     color: '#fff',
     fontSize: (13),
     textAlign: 'center',
-
   },
   slideshowContainer: {
     marginVertical: (10),
-
   },
   slide: {
     width: (width - 32),
@@ -479,13 +453,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginRight: (16),
     backgroundColor: '#333',
-
   },
   slideImage: {
     width: '100%',
     height: (120),
     resizeMode: 'cover',
-
   },
   slideText: {
     color: '#fff',
@@ -493,13 +465,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginTop: (8),
     paddingHorizontal: (8),
-
   },
   dotContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-
   },
   dot: {
     width: (10),
@@ -507,17 +477,13 @@ const styles = StyleSheet.create({
     borderRadius: (10 / 2),
     backgroundColor: '#ccc',
     marginHorizontal: (5),
-
   },
   inactiveDot: {
     backgroundColor: '#888',
-
   },
   activeDot: {
     width: (15),
     borderRadius: (15 / 2),
     backgroundColor: '#0220b8',
-
   }
-
 });

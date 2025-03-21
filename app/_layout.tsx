@@ -1,6 +1,6 @@
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, SafeAreaView, Platform, Dimensions } from "react-native";
+import { View, Text, StyleSheet, SafeAreaView, Platform } from "react-native";
 import NetInfo from "@react-native-community/netinfo";
 import * as NavigationBar from "expo-navigation-bar";
 import * as ScreenOrientation from "expo-screen-orientation";
@@ -8,19 +8,7 @@ import LottieView from "lottie-react-native";
 import loadingAnimation from "../assets/animations/loading.json";
 import DrawerNavigator from "./(tabs)/DrawerNavigator";
 import { Ionicons } from '@expo/vector-icons';
-import { PipProvider } from '../contexts/PipContext';
-import FloatingPipPlayer from '../components/FloatingPipPlayer';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-
-const baseWidth = Dimensions.get('window').width; 
-const baseHeight = Dimensions.get('window').height; 
-
-
-const scale = Math.min(SCREEN_WIDTH / baseWidth, SCREEN_HEIGHT / baseHeight);
-const moderateScale = (size: number, factor = 0.4) => size + (scale - 1) * factor;
-
 
 export default function Layout() {
     const [isOnline, setIsOnline] = useState(true);
@@ -52,7 +40,7 @@ export default function Layout() {
         })();
 
         return () => {
-              ScreenOrientation.unlockAsync();
+            ScreenOrientation.unlockAsync();
         };
     }, []);
 
@@ -72,39 +60,36 @@ export default function Layout() {
 
     return (
         <SafeAreaProvider>
-            <PipProvider>
-                <View style={styles.container}>
-                    <StatusBar style="light" translucent={true} backgroundColor="transparent" />
-                    {isLoading ? (
-                        <View style={styles.loadingContainer}>
-                            <LottieView
-                                source={loadingAnimation}
-                                autoPlay
-                                loop
-                                style={styles.lottieAnimation}
-                            />
-                            <Text style={styles.loadingText}>Loading...</Text>
-                        </View>
-                    ) : (
-                        <>
-                            {!isOnline && (
-                                <View style={[styles.banner, { backgroundColor: "red" }]}>
-                                    <Ionicons name="cloud-offline" size={moderateScale(20)} color="white" style={styles.icon} />
-                                    <Text style={[styles.text, { fontSize: moderateScale(16) }]}>No Internet Connection</Text>
-                                </View>
-                            )}
-                            {showBackOnline && (
-                                <View style={[styles.banner, { backgroundColor: "green" }]}>
-                                    <Ionicons name="cloud-done" size={moderateScale(20)} color="white" style={styles.icon} />
-                                    <Text style={[styles.text, { fontSize: moderateScale(16) }]}>Back Online</Text>
-                                </View>
-                            )}
-                            <DrawerNavigator />
-                            <FloatingPipPlayer />
-                        </>
-                    )}
-                </View>
-            </PipProvider>
+            <View style={styles.container}>
+                <StatusBar style="light" translucent={true} backgroundColor="transparent" />
+                {isLoading ? (
+                    <View style={styles.loadingContainer}>
+                        <LottieView
+                            source={loadingAnimation}
+                            autoPlay
+                            loop
+                            style={styles.lottieAnimation}
+                        />
+                        <Text style={styles.loadingText}>Loading...</Text>
+                    </View>
+                ) : (
+                    <>
+                        {!isOnline && (
+                            <View style={[styles.banner, { backgroundColor: "red" }]}>
+                                <Ionicons name="cloud-offline" size={20} color="white" style={styles.icon} />
+                                <Text style={[styles.text, { fontSize: 16 }]}>No Internet Connection</Text>
+                            </View>
+                        )}
+                        {showBackOnline && (
+                            <View style={[styles.banner, { backgroundColor: "green" }]}>
+                                <Ionicons name="cloud-done" size={20} color="white" style={styles.icon} />
+                                <Text style={[styles.text, { fontSize: 16 }]}>Back Online</Text>
+                            </View>
+                        )}
+                        <DrawerNavigator />
+                    </>
+                )}
+            </View>
         </SafeAreaProvider>
     );
 }
@@ -112,43 +97,38 @@ export default function Layout() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: "#000",
-        position: 'relative',
+
     },
     loadingContainer: {
         flex: 1,
         backgroundColor: "#000",
         justifyContent: "center",
         alignItems: "center",
-        padding: moderateScale(5),
+        padding: 10,
     },
-
     lottieAnimation: {
-        width: '50%',
-        height: undefined,
-        aspectRatio: 1,
+        width: 150,
+        height: 150,
     },
     loadingText: {
         color: "white",
-        marginTop: moderateScale(20),
-        fontSize: moderateScale(16),
+        marginTop: 20,
+        fontSize: 16,
     },
     banner: {
         flexDirection: "row",
         justifyContent: "center",
         alignItems: "center",
-        padding: moderateScale(10),
-        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        padding: 10,
         position: 'absolute',
-        top: Platform.OS === 'ios' ? moderateScale(10) : 0,
+        top: Platform.OS === 'ios' ? 10 : 0,
         width: '100%',
     },
-
     icon: {
-        marginRight: moderateScale(8),
+        marginRight: 8,
     },
     text: {
         color: "white",
-        fontSize: moderateScale(16),
+        fontSize: 16,
     },
 });

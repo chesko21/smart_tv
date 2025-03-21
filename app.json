@@ -2,7 +2,7 @@
   "expo": {
     "name": "smart_tv",
     "slug": "smart_tv",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/ic_launcher.png",
     "scheme": "myapp",
@@ -51,7 +51,7 @@
       [
         "expo-screen-orientation",
         {
-          "initialOrientation": "PORTRAIT_UP"
+          "initialOrientation": "PORTRAIT"
         }
       ],
       [
