@@ -284,7 +284,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
               controls={false}
               progressUpdateInterval={1000}
               onError={handleError}
-              resizeMode={isFullscreen ? "contain" : "contain"} 
+              resizeMode="contain"
               onLoadStart={handleLoadStart}
               onLoad={handleLoad}
               onBuffer={handleBuffer}
@@ -422,17 +422,17 @@ const styles = StyleSheet.create({
     height: "100%",
   },
   videoContainer: {
-    flex: 1,
-    justifyContent: "center", 
-    alignItems: "center",
-    backgroundColor: "#000",
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   video: {
-    width: "100%",
-    height: "100%", 
-    backgroundColor: '#000', 
-    alignSelf: "center",
-
+    width: '100%',
+    height: '100%',
   },
   overlay: {
     position: "absolute",

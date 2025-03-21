@@ -21,14 +21,18 @@ import ChannelList from "../../components/ChannelList";
 import * as ScreenOrientation from 'expo-screen-orientation';
 import default_logo from "../../assets/images/tv_banner.png";
 
-export const watchHistoryEvent = new EventEmitter();
+type WatchHistoryEvents = {
+  historyUpdated: void;
+};
+
+export const watchHistoryEvent = new EventEmitter<WatchHistoryEvents>();
 
 const PlayerScreen = ({ route }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const { url } = route.params || {};
   const { channels, refetch, upcomingProgrammes } = useM3uParse();
   const navigation = useNavigation();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const selectedChannel = channels.find((channel) => channel.url === url);
   const channelName = selectedChannel?.name || "Unknown Channel";
 
@@ -83,7 +87,7 @@ const PlayerScreen = ({ route }) => {
     saveWatchHistory(url, channelName);
   }, [url, channelName]);
 
-  const handleBuffer = useCallback(({ isBuffering }) => {
+  const handleBuffer = useCallback(({ isBuffering }: { isBuffering: boolean }) => {
     setIsPlaying(!isBuffering);
   }, []);
 
@@ -115,7 +119,7 @@ const PlayerScreen = ({ route }) => {
     }
   }, [refetch]);
 
-  const saveWatchHistory = useCallback(async (videoUrl, channelName) => {
+  const saveWatchHistory = useCallback(async (videoUrl: any, channelName: any) => {
     try {
       const existingHistory = await AsyncStorage.getItem('watchHistory');
       const history = existingHistory ? JSON.parse(existingHistory) : [];
@@ -143,9 +147,18 @@ const PlayerScreen = ({ route }) => {
     }
   }, [selectedChannel]);
 
+  useEffect(() => {
+    if (isFullscreen) {
+      StatusBar.setHidden(true);
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+    } else {
+      StatusBar.setHidden(false);
+      ScreenOrientation.unlockAsync();
+    }
+  }, [isFullscreen]);
+
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar hidden={true} />
       <ScrollView
         contentContainerStyle={styles.scrollViewContent}
         bounces={true}
@@ -155,7 +168,7 @@ const PlayerScreen = ({ route }) => {
       >
         <View style={styles.contentContainer}>
           {url ? (
-            <View style={[styles.videoContainer, { height: isFullscreen ? '100%' : '35%', width , alignSelf: "center"}]}>
+            <View style={[styles.videoContainer, { height: isFullscreen ? height : '35%', width: isFullscreen ? width : '100%', alignSelf: "center" }]}>
               <VideoPlayer
                 key={url}
                 url={url}
@@ -220,12 +233,13 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     textAlign: "center",
-    paddingHorizontal: 20,
+    paddingHorizontal: 10,
     paddingVertical: 10,
   },
   videoContainer: {
-    alignContent: "center",
+    alignSelf: "center",
     width: "100%",
+    height: "35%",
   },
   channelListWithUpcoming: {
     marginTop: 20,
